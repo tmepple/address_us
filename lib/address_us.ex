@@ -393,12 +393,13 @@ defmodule AddressUS.Parser do
 
   # Parses the post direction field out of the address list and returns
   # {post_direction, leftover_address_list}.
-  defp get_post_direction(address) when not is_list(address), do: {nil, nil}
-  defp get_post_direction([]), do: {nil, nil}
+  defp get_post_direction(address) when not is_list(address), do: {nil, nil, nil}
+  defp get_post_direction([]), do: {nil, nil, nil}
   defp get_post_direction(address), do: get_post_direction(address, nil, false)
 
   defp get_post_direction(address, post_direction, true) do
-    {post_direction, address}
+    {post_direction, title_case(Map.get(AddressUSConfig.reversed_directions(), post_direction)),
+     address}
   end
 
   defp get_post_direction(address, post_direction, false) do
@@ -487,21 +488,21 @@ defmodule AddressUS.Parser do
     cond do
       single_word_direction != "" && next_is_direction &&
           tail_tail_head_is_keyword ->
-        {single_word_direction, head, tail}
+        {single_word_direction, title_case(head), tail}
 
       single_word_direction != "" && next_is_direction &&
           tail_tail_head == nil ->
-        {single_word_direction, head, tail}
+        {single_word_direction, title_case(head), tail}
 
       single_word_direction != "" && next_is_direction &&
           !tail_tail_head_is_keyword ->
-        {double_word_direction, head <> tail_head, tail_tail}
+        {double_word_direction, title_case(head <> tail_head), tail_tail}
 
       # single_word_direction != "" && tail == [] ->
       #   {nil, address}
 
       single_word_direction != "" ->
-        {single_word_direction, head, tail}
+        {single_word_direction, title_case(head), tail}
 
       true ->
         {nil, nil, address}
@@ -894,9 +895,6 @@ defmodule AddressUS.Parser do
       Enum.map(address, &safe_replace(&1, ",", ""))
       |> log_term("cleaned")
 
-    # Move Parens to extraneous here unless they embed a secondary (ste 223) in which case
-    # should be parsed as a secondary
-
     {trailing_parens, address_no_trailing_parens} =
       get_trailing_parens(cleaned_address)
       |> log_term("get_trailing_parens")
@@ -905,7 +903,7 @@ defmodule AddressUS.Parser do
       get_secondary(address_no_trailing_parens)
       |> log_term("get_secondary")
 
-    {post_direction, address_no_secondary_direction} =
+    {post_direction, raw_post_direction, address_no_secondary_direction} =
       get_post_direction(address_no_secondary)
       |> log_term("get_post_direction")
 
@@ -937,27 +935,30 @@ defmodule AddressUS.Parser do
     #     false -> street_name
     #   end
 
-    {final_name, pre_direction, suffix, final_secondary_val} =
-      case {street_name, box, pre_direction, suffix, p_val, p_des} do
-        {nil, b, _, _, _, _} when b != nil ->
-          {box, pre_direction, suffix, p_val}
+    {final_name, pre_direction, suffix, final_secondary_val, post_direction} =
+      case {street_name, box, pre_direction, suffix, p_val, p_des, post_direction} do
+        {nil, b, _, _, _, _, _} when b != nil ->
+          {box, pre_direction, suffix, p_val, post_direction}
 
-        {nil, _, _, _, pv, nil} when pv != nil ->
-          {pv, pre_direction, suffix, nil}
+        {nil, _, _, _, pv, nil, _} when pv != nil ->
+          {pv, pre_direction, suffix, nil, post_direction}
 
         # It's much more likely a suffix is really the street name (when name is nil)
         # unless the suffix is in a short list of common suffixes which should never be street names
-        {nil, _, pre, suf, _, _} when pre != nil and suf in ["St", "Dr"] ->
-          {raw_pre_direction, nil, suffix, p_val}
+        {nil, _, pre, suf, _, _, _} when pre != nil and suf in ["St", "Dr"] ->
+          {raw_pre_direction, nil, suffix, p_val, post_direction}
 
-        {nil, _, _pre, suf, _, _} when suf != nil ->
-          {raw_suffix, pre_direction, nil, p_val}
+        {nil, _, _pre, suf, _, _, _} when suf != nil ->
+          {raw_suffix, pre_direction, nil, p_val, post_direction}
 
-        {nil, _, pre, _suf, _, _} when pre != nil ->
-          {raw_pre_direction, nil, suffix, p_val}
+        {nil, _, pre, _suf, _, _, _} when pre != nil ->
+          {raw_pre_direction, nil, suffix, p_val, post_direction}
+
+        {nil, _, _, _, _, _, post} when post != nil ->
+          {raw_post_direction, nil, suffix, p_val, nil}
 
         _ ->
-          {street_name, pre_direction, suffix, p_val}
+          {street_name, pre_direction, suffix, p_val, post_direction}
       end
 
     # IO.inspect(name, label: "name")
@@ -1205,11 +1206,12 @@ defmodule AddressUS.Parser do
     |> safe_replace(~r/,(\S)/, ", \\1")
     |> safe_replace(~r/\s,(\S)/, ", \\1")
     |> safe_replace(~r/(\S),\s/, "\\1, ")
-    |> safe_replace(~r/\.(\S)/, ". \\1")
-    |> safe_replace(~r/\s\.\s/, ". ")
-    |> safe_replace(~r/\s\.(\S)/, ". \\1")
-    |> safe_replace(~r/(\S)\.\s/, "\\1. ")
-    |> safe_replace(~r/\./, "")
+    # |> safe_replace(~r/\.(\S)/, ". \\1")
+    # |> safe_replace(~r/\s\.\s/, ". ")
+    # |> safe_replace(~r/\s\.(\S)/, ". \\1")
+    # |> safe_replace(~r/(\S)\.\s/, "\\1. ")
+    # remove periods that are not adjacent to digits
+    |> safe_replace(~r/(?!\d)\.(?!\d)/, "")
     |> safe_replace(~r/(?i)P O BOX/, "PO BOX")
     |> safe_replace(~r/\s,\s/, ", ")
   end
@@ -1350,7 +1352,7 @@ defmodule AddressUS.Parser do
   end
 
   defp log_term(term, label) do
-    # Logger.debug(label <> ": " <> inspect(term))
+    Logger.debug(label <> ": " <> inspect(term))
     term
   end
 end

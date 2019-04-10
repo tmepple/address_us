@@ -318,7 +318,7 @@ defmodule AddressUSConfig do
       "WESTERN SAHARA" => "EH",
       "YEMEN" => "YE",
       "ZAMBIA" => "ZM",
-      "ZIMBABWE?" => "ZW"
+      "ZIMBABWE" => "ZW"
     }
   end
 
@@ -343,7 +343,8 @@ defmodule AddressUSConfig do
       "Side" => "Side",
       "Slip" => "Slip",
       "Space" => "Spc",
-      "Stop" => "Stop",
+      # False positive with roads named Stop
+      # "Stop" => "Stop",
       "Suite" => "Ste",
       "Trailer" => "Trlr",
       "Unit" => "Unit",
@@ -680,7 +681,8 @@ defmodule AddressUSConfig do
       "OVL" => "Oval",
       "OVERPASS" => "Opas",
       "PARK" => "Park",
-      "PK" => "Park",
+      # Too many false positives with Pike and not found in Pub 28
+      # "PK" => "Park",
       "PRK" => "Park",
       "PARKS" => "Park",
       "PARKWAY" => "Pkwy",

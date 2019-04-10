@@ -1372,7 +1372,7 @@ defmodule AddressUSTest do
     assert desired_result == parse_address("2060 Airport Drive Hanger #39, Elkhart, IN 46514")
   end
 
-  test "708 S HEATON (STATE ROAD 35), KNOX, IN" do
+  test "708 S. HEATON (STATE ROAD 35), KNOX, IN" do
     desired_result = %Address{
       city: "Knox",
       state: "IN",
@@ -1400,5 +1400,48 @@ defmodule AddressUSTest do
     }
 
     assert desired_result == parse_address("114 US Hwy 27N, Fountain City, IN  47341")
+  end
+
+  # Retain decimal if adjacent to at least one number
+  test "404 E Main St (1.3 mi south of Market)" do
+    desired_result = %Street{
+      additional_designation: "1.3 Mi South Of Market",
+      name: "Main",
+      pre_direction: "E",
+      primary_number: "404",
+      suffix: "St"
+    }
+
+    assert desired_result == parse_address_line("404 E Main St (1.3 mi south of Market)")
+  end
+
+  # Stop is used as a street name and shouldn't be called out as a secondary unit
+  test "404 W Stop 18" do
+    desired_result = %Street{
+      name: "Stop 18",
+      pre_direction: "W",
+      primary_number: "404"
+    }
+
+    assert desired_result == parse_address_line("404 W Stop 18")
+  end
+
+  test "404 South St" do
+    desired_result = %Street{
+      name: "South",
+      suffix: "St",
+      primary_number: "404"
+    }
+
+    assert desired_result == parse_address_line("404 South St")
+  end
+
+  test "202 South" do
+    desired_result = %Street{
+      name: "South",
+      primary_number: "202"
+    }
+
+    assert desired_result == parse_address_line("202 South")
   end
 end
