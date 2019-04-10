@@ -24,7 +24,8 @@ defmodule Street do
             post_direction: nil,
             secondary_designator: nil,
             secondary_value: nil,
-            suffix: nil
+            suffix: nil,
+            additional_designation: nil
 end
 
 defmodule AddressUS.Parser do
@@ -216,6 +217,7 @@ defmodule AddressUS.Parser do
   end
 
   defp get_city(address, backup, city, false) do
+    log_term({address, city}, "get_city called")
     [head | tail] = address
 
     tail_head =
@@ -225,6 +227,9 @@ defmodule AddressUS.Parser do
       end
 
     cond do
+      String.contains?(head, ")") or String.contains?(head, "(") ->
+        get_city(address, backup, city, true)
+
       is_keyword?(head) && city == nil ->
         get_city(tail, backup, merge_names(city, head), false)
 
@@ -772,7 +777,7 @@ defmodule AddressUS.Parser do
   end
 
   # Parses the suffix out of the address list and returns
-  # {suffix, leftover_address_list}
+  # {processed suffix, raw suffix, leftover_address_list}
   defp get_suffix(address) when not is_list(address), do: {nil, nil, nil}
   defp get_suffix([]), do: {nil, nil, nil}
   defp get_suffix(address), do: get_suffix(address, nil, nil, false)
@@ -794,6 +799,68 @@ defmodule AddressUS.Parser do
     end
   end
 
+  # Parses any trailing parenthesis out of the address list and returns
+  # {additional designation in parenthesis, leftover_address_list}
+  defp get_trailing_parens(address) when not is_list(address), do: {nil, nil}
+  defp get_trailing_parens([]), do: {nil, nil}
+  defp get_trailing_parens(address), do: get_trailing_parens(address, address, nil, false)
+  defp get_trailing_parens([], backup, _city, false), do: {nil, backup}
+
+  defp get_trailing_parens(address, _backup, nil, true) do
+    {nil, address}
+  end
+
+  defp get_trailing_parens(address, backup, trailing_paren, true) do
+    # Detect if trailing_paren is really a secondary designator/value.  If so then abort.
+    # Also remove any remaining parens in the output
+    units = AddressUSConfig.secondary_units()
+    all_unit_values = Map.keys(units) ++ Map.values(units)
+    head = String.split(trailing_paren, " ") |> List.first()
+
+    if String.first(head) == "#" or Enum.member?(all_unit_values, title_case(head)) do
+      {nil, Enum.map(backup, fn x -> String.replace(x, ~r/(\(|\))/, "") end)}
+    else
+      {title_case(trailing_paren),
+       Enum.map(address, fn x -> String.replace(x, ~r/(\(|\))/, "") end)}
+    end
+  end
+
+  # First run-through
+  defp get_trailing_parens(address, backup, nil, false) do
+    # addr_str = Enum.reverse(address) |> Enum.join(" ")
+    [head | tail] = address
+
+    case {String.first(head), String.last(head), String.length(head)} do
+      {"(", ")", len} when len > 2 ->
+        get_trailing_parens(tail, nil, String.slice(head, 1..-2), true)
+
+      {_any, ")", _len} ->
+        get_trailing_parens(tail, backup, String.slice(head, 0..-2), false)
+
+      _ ->
+        get_trailing_parens(address, backup, nil, true)
+    end
+  end
+
+  defp get_trailing_parens(address, backup, trailing_paren, false) do
+    [head | tail] = address
+
+    case String.first(head) do
+      # Found the open paren
+      "(" ->
+        get_trailing_parens(
+          tail,
+          backup,
+          String.replace_leading(head, "(", "") <> " " <> trailing_paren,
+          true
+        )
+
+      # Add word to accumulator and continue
+      _ ->
+        get_trailing_parens(tail, backup, head <> " " <> trailing_paren, false)
+    end
+  end
+
   # Parses an address list for all of the requisite address parts and returns
   # a Street module.
   # p_val = possible secondary value
@@ -810,8 +877,12 @@ defmodule AddressUS.Parser do
     # Move Parens to extraneous here unless they embed a secondary (ste 223) in which case
     # should be parsed as a secondary
 
+    {trailing_parens, address_no_trailing_parens} =
+      get_trailing_parens(cleaned_address)
+      |> log_term("get_trailing_parens")
+
     {designator, value, pmb, address_no_secondary} =
-      get_secondary(cleaned_address)
+      get_secondary(address_no_trailing_parens)
       |> log_term("get_secondary")
 
     {post_direction, address_no_secondary_direction} =
@@ -915,7 +986,8 @@ defmodule AddressUS.Parser do
       pmb: pmb,
       suffix: suffix,
       primary_number: primary_number,
-      name: final_name
+      name: final_name,
+      additional_designation: trailing_parens
     }
   end
 
@@ -1086,8 +1158,9 @@ defmodule AddressUS.Parser do
     |> safe_replace(~r/\sMLK\s/, " Martin Luther King ")
     |> safe_replace(~r/\sMLKING\s/, " Martin Luther King ")
     |> safe_replace(~r/\sML KING\s/, " Martin Luther King ")
-    # |> safe_replace(~r/(.+)\(/, "\\1 (")
-    # |> safe_replace(~r/\)(.+)/, ") \\1")
+    |> safe_replace(~r/(.+)\(/, "\\1 (")
+    |> safe_replace(~r/\)(.+)/, ") \\1")
+    # NOTE: Don't remove parenthesis yet
     # |> safe_replace(~r/\((.+)\)/, "\\1")
     |> safe_replace(~r/(?i)\sAND\s/, "&")
     |> safe_replace(~r/(?i)\sI.E.\s/, "")
@@ -1104,6 +1177,7 @@ defmodule AddressUS.Parser do
     |> safe_replace(~r/(?i)US (\d+)/, "US Hwy \\1")
     |> safe_replace(~r/(?i)(\d+) Hwy (\d+)/, "\\1 Highway \\2")
     |> safe_replace(~r/(.+)#/, "\\1 #")
+    # TODO: Remove double quote and replace single quote with a space
     |> safe_replace(~r/\n/, ", ")
     |> safe_replace(~r/\t/, " ")
     |> safe_replace(~r/\s+/, " ")
