@@ -402,7 +402,17 @@ defmodule AddressUS.Parser do
   end
 
   defp get_post_direction(address, post_direction, false) do
+    log_term({address, post_direction}, "get_post_direction_internals")
+
     [head | tail] = address
+
+    detect_attached_post_direction = Regex.run(~r/^\d+([a-zA-Z])$/, head)
+
+    attached_post_direction =
+      if detect_attached_post_direction,
+        do: get_direction_value(List.last(detect_attached_post_direction)),
+        else: nil
+
     direction_value = get_direction_value(head)
 
     new_direction =
@@ -411,7 +421,16 @@ defmodule AddressUS.Parser do
         false -> direction_value <> post_direction
       end
 
+    log_term({head, direction_value, new_direction, post_direction, address, tail}, "before cond")
+
     cond do
+      attached_post_direction ->
+        get_post_direction(
+          [attached_post_direction | [String.slice(head, 0..-2) | tail]],
+          post_direction,
+          false
+        )
+
       get_direction_value(head) == "" ->
         get_post_direction(address, post_direction, true)
 
@@ -521,6 +540,7 @@ defmodule AddressUS.Parser do
   end
 
   defp get_secondary(address, backup, pmb, designator, value, false) do
+    log_term({address, pmb, designator, value}, "get_secondary_internals")
     [head | tail] = address
 
     {tail_head, tail_tail} =
@@ -535,7 +555,7 @@ defmodule AddressUS.Parser do
     directions = AddressUSConfig.directions()
 
     cond do
-      string_is_number?(head) ->
+      string_is_number?(head) or string_starts_with_number?(head) ->
         cond do
           contains_po_box?(tail) || is_state?(tail_head) ->
             get_secondary(tail, backup, pmb, designator, value, false)
@@ -1173,13 +1193,14 @@ defmodule AddressUS.Parser do
     |> safe_replace(~r/(?i)\sATTENTION\s/, "")
     |> safe_replace(~r/(?i)\sATTN\s/, "")
     |> safe_replace(~r/(?i)\ss#\ss(\S)/, " #\\1")
-    |> safe_replace(~r/(?i)P O BOX/, "PO BOX")
+    # |> safe_replace(~r/(?i)P O BOX/, "PO BOX")
     |> safe_replace(~r/(?i)US (\d+)/, "US Hwy \\1")
     |> safe_replace(~r/(?i)(\d+) Hwy (\d+)/, "\\1 Highway \\2")
     |> safe_replace(~r/(.+)#/, "\\1 #")
-    # TODO: Remove double quote and replace single quote with a space
     |> safe_replace(~r/\n/, ", ")
     |> safe_replace(~r/\t/, " ")
+    |> safe_replace(~r/\"/, "")
+    |> safe_replace(~r/\'/, " ")
     |> safe_replace(~r/\s+/, " ")
     |> safe_replace(~r/,(\S)/, ", \\1")
     |> safe_replace(~r/\s,(\S)/, ", \\1")
@@ -1189,6 +1210,7 @@ defmodule AddressUS.Parser do
     |> safe_replace(~r/\s\.(\S)/, ". \\1")
     |> safe_replace(~r/(\S)\.\s/, "\\1. ")
     |> safe_replace(~r/\./, "")
+    |> safe_replace(~r/(?i)P O BOX/, "PO BOX")
     |> safe_replace(~r/\s,\s/, ", ")
   end
 
@@ -1301,6 +1323,10 @@ defmodule AddressUS.Parser do
       true -> false
     end
   end
+
+  defp string_starts_with_number?(value) when is_number(value), do: true
+  defp string_starts_with_number?(value) when not is_binary(value), do: false
+  defp string_starts_with_number?(value), do: string_is_number?(String.first(value))
 
   # Determines if value is a number or a fraction.
   defp string_is_number_or_fraction?(value) when not is_binary(value), do: false

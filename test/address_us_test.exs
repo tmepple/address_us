@@ -1356,8 +1356,6 @@ defmodule AddressUSTest do
   end
 
   test "2060 Airport Drive Hanger #39, Elkhart, IN 46514" do
-    addr = "2060 Airport Drive Hanger #39, Elkhart, IN 46514"
-
     desired_result = %Address{
       city: "Elkhart",
       state: "IN",
@@ -1371,6 +1369,36 @@ defmodule AddressUSTest do
       }
     }
 
-    assert desired_result == parse_address(addr)
+    assert desired_result == parse_address("2060 Airport Drive Hanger #39, Elkhart, IN 46514")
+  end
+
+  test "708 S HEATON (STATE ROAD 35), KNOX, IN" do
+    desired_result = %Address{
+      city: "Knox",
+      state: "IN",
+      street: %Street{
+        name: "Heaton",
+        primary_number: "708",
+        pre_direction: "S",
+        additional_designation: "State Road 35"
+      }
+    }
+
+    assert desired_result == parse_address("708 S HEATON (STATE ROAD 35), KNOX, IN")
+  end
+
+  test "114 US Hwy 27N, Fountain City, IN  47341" do
+    desired_result = %Address{
+      city: "Fountain City",
+      state: "IN",
+      postal: "47341",
+      street: %Street{
+        name: "US Hwy 27",
+        primary_number: "114",
+        post_direction: "N"
+      }
+    }
+
+    assert desired_result == parse_address("114 US Hwy 27N, Fountain City, IN  47341")
   end
 end
