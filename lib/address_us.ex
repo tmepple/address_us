@@ -1350,7 +1350,7 @@ defmodule AddressUS.Parser do
   end
 
   defp log_term(term, label) do
-    Logger.debug(label <> ": " <> inspect(term))
+    # Logger.debug(label <> ": " <> inspect(term))
     term
   end
 end
