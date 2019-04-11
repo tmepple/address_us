@@ -318,6 +318,13 @@ defmodule AddressUS.Parser do
         string_is_number_or_fraction?(hd(tail))
       end
 
+    next_is_fraction =
+      if length(tail) == 0 do
+        false
+      else
+        string_is_fraction?(hd(tail))
+      end
+
     regex = ~r/(\d+)[-\s]*([A-Za-z]+.*)/
 
     cond do
@@ -334,7 +341,12 @@ defmodule AddressUS.Parser do
 
         get_number([], backup, safe_replace(number, "#", ""), "PO BOX", p_val, p_des, true)
 
-      number == nil && string_is_number_or_fraction?(head) && next_is_number ->
+      # If we have an address like "250 200 N" the "200 N" is really the street name.  Only if the
+      # second number is a fraction do we want to keep it in the number.
+      # number == nil && string_is_number_or_fraction?(head) && next_is_number ->
+      #   get_number(tl(tail), backup, head <> " " <> hd(tail), box, p_val, p_des, true)
+
+      number == nil && string_is_number_or_fraction?(head) && next_is_fraction ->
         get_number(tl(tail), backup, head <> " " <> hd(tail), box, p_val, p_des, true)
 
       Enum.member?(address, "&") ->
@@ -1388,6 +1400,23 @@ defmodule AddressUS.Parser do
       string_is_number?(value) ->
         true
 
+      String.match?(value, ~r/\//) ->
+        values = String.split(value, "/")
+
+        case Enum.count(values) do
+          2 -> Enum.all?(values, &string_is_number?(&1))
+          _ -> false
+        end
+
+      true ->
+        false
+    end
+  end
+
+  defp string_is_fraction?(value) when not is_binary(value), do: false
+
+  defp string_is_fraction?(value) do
+    cond do
       String.match?(value, ~r/\//) ->
         values = String.split(value, "/")
 

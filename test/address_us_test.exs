@@ -1512,4 +1512,19 @@ defmodule AddressUSTest do
 
     assert desired_result == parse_address_line("1201 NE")
   end
+
+  test "275 250 N, Warsaw, IN  46580" do
+    desired_result = %Address{
+      city: "Warsaw",
+      postal: "46580",
+      state: "IN",
+      street: %Street{
+        name: "250",
+        post_direction: "N",
+        primary_number: "275"
+      }
+    }
+
+    assert desired_result == parse_address("275 250 N, Warsaw, IN  46580")
+  end
 end
