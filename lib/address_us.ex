@@ -230,7 +230,7 @@ defmodule AddressUS.Parser do
       String.contains?(head, ")") or String.contains?(head, "(") ->
         get_city(address, backup, city, true)
 
-      is_keyword?(head) && city == nil ->
+      is_sec_unit_suffix_num_or_frac?(head) && city == nil ->
         get_city(tail, backup, merge_names(city, head), false)
 
       String.ends_with?(tail_head, ",") ->
@@ -242,14 +242,14 @@ defmodule AddressUS.Parser do
       Enum.count(clean_hyphenated_street(head)) > 1 ->
         get_city(address, backup, city, true)
 
-      city != nil && !is_keyword?(head) && address != [] &&
+      city != nil && !is_sec_unit_suffix_num_or_frac?(head) && address != [] &&
           is_possible_suite_number?(tail_head) ->
         get_city(address, backup, city, true)
 
-      city != nil && !is_keyword?(head) && address != [] ->
+      city != nil && !is_sec_unit_suffix_num_or_frac?(head) && address != [] ->
         get_city(tail, backup, merge_names(city, head), false)
 
-      city != nil && is_keyword?(head) ->
+      city != nil && is_sec_unit_suffix_num_or_frac?(head) ->
         pre_keyword_white_list = ["SALT", "WEST", "PALM"]
 
         cond do
@@ -260,7 +260,7 @@ defmodule AddressUS.Parser do
             get_city(address, backup, city, true)
         end
 
-      is_keyword?(head) ->
+      is_sec_unit_suffix_num_or_frac?(head) ->
         get_city(address, backup, city, true)
 
       contains_po_box?(tail) ->
@@ -485,9 +485,9 @@ defmodule AddressUS.Parser do
     double_word_direction =
       get_direction_value(get_direction_value(head) <> get_direction_value(tail_head))
 
-    tail_tail_head_is_keyword = is_keyword?(tail_tail_head)
+    tail_tail_head_is_keyword = is_sec_unit_suffix_num_or_frac?(tail_tail_head)
 
-    log_term({single_word_direction, next_is_direction, tail}, "g_p_d_internals")
+    log_term({single_word_direction, next_is_direction, tail}, "get_pre_direction internals")
 
     cond do
       single_word_direction != "" && next_is_direction &&
@@ -784,7 +784,7 @@ defmodule AddressUS.Parser do
 
       length(clean_hyphenated_street(head)) > 1 ->
         cond do
-          is_keyword?(street) ->
+          is_sec_unit_suffix_num_or_frac?(street) ->
             get_street(tail, street <> " " <> head, false)
 
           true ->
@@ -969,24 +969,26 @@ defmodule AddressUS.Parser do
       get_street(address_no_pre_direction)
       |> log_term("get_street")
 
-    # name =
-    #   case street_name == nil && !(box == nil) do
-    #     true -> box
-    #     false -> street_name
-    #   end
-
+    # Deal with a possible NIL street name after the above processing
     {final_name, pre_direction, suffix, final_secondary_val, post_direction} =
       case {street_name, box, pre_direction, suffix, p_val, p_des, post_direction} do
+        # TODO: Check on what addresses would make this occur
         {nil, b, _, _, _, _, _} when b != nil ->
           {box, pre_direction, suffix, p_val, post_direction}
 
+        # TODO: Check on what addresses would make this occur
         {nil, _, _, _, pv, nil, _} when pv != nil ->
           {pv, pre_direction, suffix, nil, post_direction}
 
-        # It's much more likely a suffix is really the street name (when name is nil)
-        # unless the suffix is in a short list of common suffixes which should never be street names
+        # If the Suffix is St or Dr (which would never be valid street names) leave it at suffix
         {nil, _, pre, suf, _, _, _} when pre != nil and suf in ["St", "Dr"] ->
           {raw_pre_direction, nil, suffix, p_val, post_direction}
+
+        # Otherwise if the suffix is something else (like Blvd, Ct, etc) and there is a pre-direction
+        # It's too ambiguous (i.e. 1410 East Boulevard or 720 Northwest Blvd) we we will just put both
+        # identifiers in the name field
+        {nil, _, pre, suf, _, _, _} when pre != nil and suf != nil ->
+          {raw_pre_direction <> " " <> raw_suffix, nil, nil, p_val, post_direction}
 
         {nil, _, _pre, suf, _, _, _} when suf != nil ->
           {raw_suffix, pre_direction, nil, p_val, post_direction}
@@ -1302,13 +1304,13 @@ defmodule AddressUS.Parser do
   defp contains_po_box?(address) do
     [head | _] = address
     full_address = address |> Enum.join(" ") |> safe_upcase
-    !is_keyword?(head) && String.match?(full_address, ~r/BOX/)
+    !is_sec_unit_suffix_num_or_frac?(head) && String.match?(full_address, ~r/BOX/)
   end
 
   # Determines if a value is a number, fraction, or postal keyword.
-  defp is_keyword?(value) when not is_binary(value), do: false
+  defp is_sec_unit_suffix_num_or_frac?(value) when not is_binary(value), do: false
 
-  defp is_keyword?(value) do
+  defp is_sec_unit_suffix_num_or_frac?(value) do
     word = title_case(value)
     units = AddressUSConfig.secondary_units()
     suffixes = AddressUSConfig.common_suffixes()

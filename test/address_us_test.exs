@@ -1348,7 +1348,7 @@ defmodule AddressUSTest do
       city: "Kokomo",
       state: "IN",
       postal: "46902",
-      street: %Street{name: "Boulevard", primary_number: "1410", pre_direction: "E"}
+      street: %Street{name: "East Boulevard", primary_number: "1410"}
     }
 
     assert desired_result == parse_address(addr)
