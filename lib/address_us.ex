@@ -429,6 +429,9 @@ defmodule AddressUS.Parser do
         do: get_direction_value(List.last(detect_attached_post_direction)),
         else: nil
 
+    attached_post_direction =
+      if attached_post_direction == "", do: nil, else: attached_post_direction
+
     direction_value = get_direction_value(head)
 
     new_direction =
@@ -440,11 +443,19 @@ defmodule AddressUS.Parser do
     log_term({head, direction_value, new_direction, post_direction, address, tail}, "before cond")
 
     cond do
+      # attached_post_direction ->
+      #   get_post_direction(
+      #     [attached_post_direction | [String.slice(head, 0..-2) | tail]],
+      #     post_direction,
+      #     append_string(raw_pd, List.last(detect_attached_post_direction)),
+      #     false
+      #   )
+
       attached_post_direction ->
         get_post_direction(
           [attached_post_direction | [String.slice(head, 0..-2) | tail]],
           post_direction,
-          append_string(raw_pd, List.last(detect_attached_post_direction)),
+          append_string(raw_pd, head),
           false
         )
 
@@ -906,6 +917,7 @@ defmodule AddressUS.Parser do
   # This function isn't intended to solve all of these cases but common ones are covered
   defp strip_additional_and_suffix_from_name(street_name, additional, suffix) do
     {street_name, additional, suffix}
+    |> safe_replace_first_elem(~r/\#/, "")
     |> strip_regex_to_additional(~r/( |\-)Po Box \w+$/)
     |> strip_regex_to_additional(~r/( |\-)Box \w+$/)
     |> strip_regex_to_additional(~r/( |\-)Milepost (\w|\.)+$/)
@@ -1023,6 +1035,12 @@ defmodule AddressUS.Parser do
     # In case the suffix wasn't parsed out due to extraneous designations still present in the street name
     {final_name, additional, suffix} =
       strip_additional_and_suffix_from_name(final_name, additional, suffix)
+
+    # If a post-direction was mistakenly taken from a Box, append it back on
+    {final_name, post_direction} =
+      if final_name && String.starts_with?(final_name, "Box") && post_direction,
+        do: {final_name <> post_direction, nil},
+        else: {final_name, post_direction}
 
     final_secondary_designator =
       cond do
@@ -1213,6 +1231,11 @@ defmodule AddressUS.Parser do
   # which case it just returns a nil.
   defp safe_replace(nil, _, _), do: nil
   defp safe_replace(value, k, v), do: String.replace(value, k, v)
+
+  defp safe_replace_first_elem({nil, _, _} = tuple, _regex, _repl), do: tuple
+
+  defp safe_replace_first_elem({value, e1, e2}, regex, repl),
+    do: {String.replace(value, regex, repl), e1, e2}
 
   # Does a standard safe_starts_with?, unless the value to be modified is a nil
   # in which case it returns false.

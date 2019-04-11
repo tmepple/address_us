@@ -1527,4 +1527,24 @@ defmodule AddressUSTest do
 
     assert desired_result == parse_address("275 250 N, Warsaw, IN  46580")
   end
+
+  test "700 South Box 6e" do
+    desired_result = %Street{
+      name: "Box 6E",
+      pre_direction: "S",
+      primary_number: "700"
+    }
+
+    assert desired_result == parse_address_line("700 South Box 6e")
+  end
+
+  test "1332 State Road #2 West" do
+    desired_result = %Street{
+      name: "State Road 2",
+      post_direction: "W",
+      primary_number: "1332"
+    }
+
+    assert desired_result == parse_address_line("1332 State Road #2 West")
+  end
 end
