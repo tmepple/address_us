@@ -1453,6 +1453,8 @@ defmodule AddressUSTest do
       primary_number: "301",
       additional_designation: "Po Box 358"
     }
+
+    assert desired_result == parse_address_line("301 Main Street PO Box 358")
   end
 
   test "301 Main Street Milepost 12.2" do
@@ -1462,5 +1464,22 @@ defmodule AddressUSTest do
       primary_number: "301",
       additional_designation: "Milepost 12.2"
     }
+
+    assert desired_result == parse_address_line("301 Main Street Milepost 12.2")
+  end
+
+  test "59-36 COOPER AVENUE, GLENDALE, NY 11385" do
+    desired_result = %Address{
+      city: "Glendale",
+      postal: "11385",
+      state: "NY",
+      street: %Street{
+        name: "Cooper",
+        primary_number: "59-36",
+        suffix: "Ave"
+      }
+    }
+
+    assert desired_result == parse_address("59-36 COOPER AVENUE, GLENDALE, NY 11385")
   end
 end

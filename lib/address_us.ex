@@ -375,16 +375,20 @@ defmodule AddressUS.Parser do
       number == nil && is_state?(head) ->
         get_number(address, backup, number, box, p_val, p_des, true)
 
+      # If there is a dash in the number, just return the whole thing including the dash
+      # It might be an address range (i.e. 101-102 E Washington) or it could be a valid Brooklyn-style address
+      # (59-36 Cooper Ave, Glendale, NY 11385)
       safe_contains?(head, "-") ->
-        [h | t] = String.split("-")
+        # [h | t] = String.split("-")
 
-        secondary_value =
-          case length(t) do
-            0 -> nil
-            _ -> hd(tail)
-          end
+        # secondary_value =
+        #   case length(t) do
+        #     0 -> nil
+        #     _ -> hd(tail)
+        #   end
 
-        get_number(tail, backup, h, box, secondary_value, "Ste", true)
+        # get_number(tail, backup, h, box, secondary_value, "Ste", true)
+        get_number(tail, backup, head, box, p_val, p_des, true)
 
       true ->
         get_number(tail, backup, number, box, p_val, p_des, false)
@@ -887,9 +891,9 @@ defmodule AddressUS.Parser do
   # This function isn't intended to solve all of these cases but common ones are covered
   defp strip_additional_and_suffix_from_name(street_name, additional, suffix) do
     {street_name, additional, suffix}
-    |> strip_regex_to_additional(~r/ Po Box \w+$/)
-    |> strip_regex_to_additional(~r/ Box \w+$/)
-    |> strip_regex_to_additional(~r/ Milepost (\w|\.)+$/)
+    |> strip_regex_to_additional(~r/( |\-)Po Box \w+$/)
+    |> strip_regex_to_additional(~r/( |\-)Box \w+$/)
+    |> strip_regex_to_additional(~r/( |\-)Milepost (\w|\.)+$/)
     |> strip_suffix()
   end
 
@@ -1064,11 +1068,11 @@ defmodule AddressUS.Parser do
   ############################################################################
 
   defp append_string(nil, str) do
-    String.trim(str)
+    String.trim(str) |> String.replace_prefix("-", "")
   end
 
   defp append_string(str1, str2) do
-    String.trim(str1) <> " " <> String.trim(str2)
+    String.trim(str1) <> String.trim(String.replace_prefix(str2, "-", ""))
   end
 
   # Cleans up hyphenated street values by removing the hyphen and returing the
@@ -1244,6 +1248,8 @@ defmodule AddressUS.Parser do
     |> safe_replace(~r/,(\S)/, ", \\1")
     |> safe_replace(~r/\s,(\S)/, ", \\1")
     |> safe_replace(~r/(\S),\s/, "\\1, ")
+    |> safe_replace(~r/-\s+/, "-")
+    |> safe_replace(~r/\s+\-/, "-")
     # |> safe_replace(~r/\.(\S)/, ". \\1")
     # |> safe_replace(~r/\s\.\s/, ". ")
     # |> safe_replace(~r/\s\.(\S)/, ". \\1")
