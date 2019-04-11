@@ -1482,4 +1482,34 @@ defmodule AddressUSTest do
 
     assert desired_result == parse_address("59-36 COOPER AVENUE, GLENDALE, NY 11385")
   end
+
+  test "1201 North E Street" do
+    desired_result = %Street{
+      name: "E",
+      suffix: "St",
+      primary_number: "1201",
+      pre_direction: "N"
+    }
+
+    assert desired_result == parse_address_line("1201 North E Street")
+  end
+
+  test "1201 E Street" do
+    desired_result = %Street{
+      name: "E",
+      suffix: "St",
+      primary_number: "1201"
+    }
+
+    assert desired_result == parse_address_line("1201 E Street")
+  end
+
+  test "1201 NE" do
+    desired_result = %Street{
+      name: "NE",
+      primary_number: "1201"
+    }
+
+    assert desired_result == parse_address_line("1201 NE")
+  end
 end

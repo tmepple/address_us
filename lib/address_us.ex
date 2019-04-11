@@ -397,16 +397,15 @@ defmodule AddressUS.Parser do
 
   # Parses the post direction field out of the address list and returns
   # {post_direction, leftover_address_list}.
-  defp get_post_direction(address) when not is_list(address), do: {nil, nil, nil}
-  defp get_post_direction([]), do: {nil, nil, nil}
-  defp get_post_direction(address), do: get_post_direction(address, nil, false)
+  defp get_post_direction(address) when not is_list(address), do: {nil, nil, nil, nil}
+  defp get_post_direction([]), do: {nil, nil, nil, nil}
+  defp get_post_direction(address), do: get_post_direction(address, nil, nil, false)
 
-  defp get_post_direction(address, post_direction, true) do
-    {post_direction, title_case(Map.get(AddressUSConfig.reversed_directions(), post_direction)),
-     address}
+  defp get_post_direction(address, post_direction, raw_pd, true) do
+    {post_direction, raw_pd, address}
   end
 
-  defp get_post_direction(address, post_direction, false) do
+  defp get_post_direction(address, post_direction, raw_pd, false) do
     log_term({address, post_direction}, "get_post_direction_internals")
 
     [head | tail] = address
@@ -433,17 +432,18 @@ defmodule AddressUS.Parser do
         get_post_direction(
           [attached_post_direction | [String.slice(head, 0..-2) | tail]],
           post_direction,
+          append_string(raw_pd, List.last(detect_attached_post_direction)),
           false
         )
 
       get_direction_value(head) == "" ->
-        get_post_direction(address, post_direction, true)
+        get_post_direction(address, post_direction, title_case(raw_pd), true)
 
       address == [] ->
-        get_post_direction(address, new_direction, true)
+        get_post_direction(address, new_direction, title_case(raw_pd), true)
 
       true ->
-        get_post_direction(tail, new_direction, false)
+        get_post_direction(tail, new_direction, append_string(raw_pd, head), false)
     end
   end
 
@@ -722,8 +722,8 @@ defmodule AddressUS.Parser do
   defp get_street(_address, street, true) do
     corner_case_street_names = %{"PGA" => "PGA", "ROUTE" => "Route", "RT" => "Route"}
     filtered_street = safe_upcase(street) |> safe_replace(~r/\s(\d+)/, "")
-    directions = AddressUSConfig.directions()
-    rev_directions = AddressUSConfig.reversed_directions()
+    # directions = AddressUSConfig.directions()
+    # rev_directions = AddressUSConfig.reversed_directions()
 
     cond do
       safe_has_key?(corner_case_street_names, filtered_street) ->
@@ -734,17 +734,20 @@ defmodule AddressUS.Parser do
         street_number = " " <> safe_replace(street, ~r/[a-zA-Z\s]+/, "")
         (street_name <> street_number) |> safe_replace(~r/\s$/, "")
 
-      Enum.member?(
-        Map.keys(directions) ++ Map.values(directions),
-        title_case(street)
-      ) ->
-        cond do
-          Map.has_key?(directions, title_case(street)) ->
-            title_case(street)
+      # # Can't assume "E" street is "East" street -- if it were a directional it would have already
+      # # been parsed into the pre_direction field
+      #
+      # Enum.member?(
+      #   Map.keys(directions) ++ Map.values(directions),
+      #   title_case(street)
+      # ) ->
+      #   cond do
+      #     Map.has_key?(directions, title_case(street)) ->
+      #       title_case(street)
 
-          true ->
-            Map.get(rev_directions, String.upcase(street))
-        end
+      #     true ->
+      #       Map.get(rev_directions, String.upcase(street))
+      #   end
 
       true ->
         street
