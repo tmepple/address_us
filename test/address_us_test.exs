@@ -1444,4 +1444,23 @@ defmodule AddressUSTest do
 
     assert desired_result == parse_address_line("202 South")
   end
+
+  # In this case 301 Main Street is the address to be parsed and the PO Box is additional information
+  test "301 Main Street PO Box 358" do
+    desired_result = %Street{
+      name: "Main",
+      suffix: "St",
+      primary_number: "301",
+      additional_designation: "Po Box 358"
+    }
+  end
+
+  test "301 Main Street Milepost 12.2" do
+    desired_result = %Street{
+      name: "Main",
+      suffix: "St",
+      primary_number: "301",
+      additional_designation: "Milepost 12.2"
+    }
+  end
 end

@@ -541,6 +541,7 @@ defmodule AddressUS.Parser do
   end
 
   defp get_secondary(address, backup, pmb, designator, value, false) do
+    # TODO: get secondary loses information in the case of "301 Main Boulevard Additional"
     log_term({address, pmb, designator, value}, "get_secondary_internals")
     [head | tail] = address
 
@@ -552,7 +553,7 @@ defmodule AddressUS.Parser do
       end
 
     units = AddressUSConfig.secondary_units()
-    suffixes = AddressUSConfig.street_suffixes()
+    suffixes = AddressUSConfig.common_suffixes()
     directions = AddressUSConfig.directions()
 
     cond do
@@ -580,7 +581,7 @@ defmodule AddressUS.Parser do
             get_secondary(backup, backup, nil, nil, nil, true)
 
           true ->
-            get_secondary(tail, backup, pmb, Map.get(units, head), value, true)
+            get_secondary(tail, backup, pmb, Map.get(units, title_case(head)), value, true)
         end
 
       Map.values(units) |> Enum.member?(title_case(head)) ->
@@ -882,6 +883,41 @@ defmodule AddressUS.Parser do
     end
   end
 
+  # Additional designations and suffixes could be present in the final processed street name
+  # This function isn't intended to solve all of these cases but common ones are covered
+  defp strip_additional_and_suffix_from_name(street_name, additional, suffix) do
+    {street_name, additional, suffix}
+    |> strip_regex_to_additional(~r/ Po Box \w+$/)
+    |> strip_regex_to_additional(~r/ Box \w+$/)
+    |> strip_regex_to_additional(~r/ Milepost (\w|\.)+$/)
+    |> strip_suffix()
+  end
+
+  defp strip_regex_to_additional({nil, _, _} = tuple, _regex), do: tuple
+
+  defp strip_regex_to_additional({street_name, additional, suffix} = tuple, regex) do
+    parts = Regex.split(regex, street_name, include_captures: true)
+
+    if length(parts) == 1 do
+      tuple
+    else
+      {List.first(parts), append_string(additional, Enum.at(parts, 1)), suffix}
+    end
+  end
+
+  # A suffix could still be embedded in the street_name at this point if additional designations exist
+  defp strip_suffix({street_name, additional, nil} = tuple) when not is_nil(additional) do
+    {suffix, _, addr_list} = street_name |> String.split(" ") |> Enum.reverse() |> get_suffix()
+
+    if suffix != nil do
+      {Enum.reverse(addr_list) |> Enum.join(" "), additional, suffix}
+    else
+      tuple
+    end
+  end
+
+  defp strip_suffix(tuple), do: tuple
+
   # Parses an address list for all of the requisite address parts and returns
   # a Street module.
   # p_val = possible secondary value
@@ -895,7 +931,7 @@ defmodule AddressUS.Parser do
       Enum.map(address, &safe_replace(&1, ",", ""))
       |> log_term("cleaned")
 
-    {trailing_parens, address_no_trailing_parens} =
+    {additional, address_no_trailing_parens} =
       get_trailing_parens(cleaned_address)
       |> log_term("get_trailing_parens")
 
@@ -961,21 +997,11 @@ defmodule AddressUS.Parser do
           {street_name, pre_direction, suffix, p_val, post_direction}
       end
 
-    # IO.inspect(name, label: "name")
+    log_term({final_name, final_secondary_val}, "final_name, secondary_val")
 
-    # {final_name, final_secondary_val} =
-    #   cond do
-    #     name == nil ->
-    #       cond do
-    #         p_val != nil && p_des == nil -> {p_val, nil}
-    #         true -> {nil, p_val}
-    #       end
-
-    #     true ->
-    #       {name, p_val}
-    #   end
-
-    log_term({final_name, final_secondary_val}, "final_name&secondary_val")
+    # In case the suffix wasn't parsed out due to extraneous designations still present in the street name
+    {final_name, additional, suffix} =
+      strip_additional_and_suffix_from_name(final_name, additional, suffix)
 
     final_secondary_designator =
       cond do
@@ -1008,7 +1034,7 @@ defmodule AddressUS.Parser do
       suffix: suffix,
       primary_number: primary_number,
       name: final_name,
-      additional_designation: trailing_parens
+      additional_designation: additional
     }
   end
 
@@ -1037,22 +1063,33 @@ defmodule AddressUS.Parser do
   ## Helper Functions
   ############################################################################
 
+  defp append_string(nil, str) do
+    String.trim(str)
+  end
+
+  defp append_string(str1, str2) do
+    String.trim(str1) <> " " <> String.trim(str2)
+  end
+
   # Cleans up hyphenated street values by removing the hyphen and returing the
   # values or the appropriate USPS abbreviations for said values in a list.
+
+  # TODO: is this to deal with I-15 and SR-44?  If so maybe it can be modified to do
+  # general string substitution for the street name field
   defp clean_hyphenated_street(value) when not is_binary(value), do: [value]
 
   defp clean_hyphenated_street(value) do
     case value |> String.match?(~r/-/) do
       true ->
-        suffix_data = AddressUSConfig.street_suffixes()
-        suffixes = Map.keys(suffix_data) ++ Map.values(suffix_data)
+        sub_data = AddressUSConfig.street_name_subs()
+        subs = Map.keys(sub_data) ++ Map.values(sub_data)
         values = value |> String.split("-")
-        truths = Enum.map(values, &Enum.member?(suffixes, safe_upcase(&1)))
+        truths = Enum.map(values, &Enum.member?(subs, safe_upcase(&1)))
 
         new_values =
           Enum.map(values, fn v ->
-            case safe_has_key?(suffix_data, safe_upcase(v)) do
-              true -> title_case(Map.get(suffix_data, safe_upcase(v)))
+            case safe_has_key?(sub_data, safe_upcase(v)) do
+              true -> title_case(Map.get(sub_data, safe_upcase(v)))
               false -> title_case(v)
             end
           end)
@@ -1104,7 +1141,7 @@ defmodule AddressUS.Parser do
   defp get_suffix_value(value) when not is_binary(value), do: nil
 
   defp get_suffix_value(value) do
-    suffixes = AddressUSConfig.street_suffixes()
+    suffixes = AddressUSConfig.common_suffixes()
     cleaned_value = title_case(value)
     capitalized_keys = Map.keys(suffixes) |> Enum.map(&title_case(&1))
     capitalized_values = Map.values(suffixes) |> Enum.map(&title_case(&1))
@@ -1188,6 +1225,7 @@ defmodule AddressUS.Parser do
     |> safe_replace(~r/(?i)\sET\sAL\s/, "")
     |> safe_replace(~r/(?i)\sIN\sCARE\sOF\s/, "")
     |> safe_replace(~r/(?i)\sCARE\sOF\s/, "")
+    |> safe_replace(~r/(?i)\sBY\sPASS\b/, " BYPASS ")
     |> safe_replace(~r/(?i)\sBY\s/, "")
     |> safe_replace(~r/(?i)\sFOR\s/, "")
     |> safe_replace(~r/(?i)\sALSO\s/, "")
@@ -1214,6 +1252,7 @@ defmodule AddressUS.Parser do
     |> safe_replace(~r/(?!\d)\.(?!\d)/, "")
     |> safe_replace(~r/(?i)P O BOX/, "PO BOX")
     |> safe_replace(~r/\s,\s/, ", ")
+    |> String.trim()
   end
 
   # Capitalizes the first letter of every word in a string and returns the
@@ -1266,7 +1305,7 @@ defmodule AddressUS.Parser do
   defp is_keyword?(value) do
     word = title_case(value)
     units = AddressUSConfig.secondary_units()
-    suffixes = AddressUSConfig.street_suffixes()
+    suffixes = AddressUSConfig.common_suffixes()
     keywords1 = Map.keys(units) ++ Map.values(units) ++ Map.values(suffixes)
     keywords2 = Map.keys(suffixes)
 
