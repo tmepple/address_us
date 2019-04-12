@@ -749,6 +749,12 @@ defmodule AddressUS.Parser do
             IO.inspect(backup, label: "at 16")
             get_secondary(backup, backup, pmb, designator, value, addit, true)
 
+          # Handle "1400 W Avenue B"
+          get_suffix_value(tail_head) == "Ave" && String.length(head) == 1 ->
+            Logger.debug("at 16a")
+            IO.inspect(backup, label: "at 16a")
+            get_secondary(backup, backup, pmb, designator, value, addit, true)
+
           true ->
             Logger.debug("at 17")
             IO.inspect(backup, label: "at 17")
