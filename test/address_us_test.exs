@@ -1573,4 +1573,16 @@ defmodule AddressUSTest do
 
     assert desired_result == parse_address_line("1040 A Avenue")
   end
+
+  test "201 E MAIN ST BOX 291" do
+    desired_result = %Street{
+      additional_designation: "Box 291",
+      name: "Main",
+      pre_direction: "E",
+      primary_number: "201",
+      suffix: "St"
+    }
+
+    assert desired_result == parse_address_line("201 E MAIN ST BOX 291")
+  end
 end

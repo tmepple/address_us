@@ -591,9 +591,11 @@ defmodule AddressUS.Parser do
     cond do
       string_is_number?(head) or string_starts_with_number?(head) ->
         cond do
-          contains_po_box?(tail) || is_state?(tail_head) ->
-            Logger.debug("at 1")
-            get_secondary(tail, backup, pmb, designator, value, addit, false)
+          # NOTE: Unsure what this code does as all existing tests run without it and it caused Box parsing issues
+          # contains_po_box?(tail) || is_state?(tail_head) ->
+          #   Logger.debug("at 1")
+          #   IO.inspect(backup, label: "at 1")
+          #   get_secondary(tail, backup, pmb, designator, value, addit, false)
 
           tail_head == '&' ->
             Logger.debug("at 2")
@@ -724,16 +726,20 @@ defmodule AddressUS.Parser do
               (String.length(tail_tail) < 2 ||
                  String.upcase(hd(tail_tail)) == "STATE") ->
             Logger.debug("at 15")
+            IO.inspect(backup, label: "at 15")
             get_secondary(backup, backup, pmb, designator, value, addit, true)
 
           Map.values(directions) |> Enum.member?(safe_upcase(head)) ||
               safe_has_key?(directions, title_case(head)) ->
             Logger.debug("at 16")
+            IO.inspect(backup, label: "at 16")
             get_secondary(backup, backup, pmb, designator, value, addit, true)
 
           true ->
             Logger.debug("at 17")
+            IO.inspect(backup, label: "at 17")
 
+            # get_secondary(backup, backup, pmb, designator, value, addit, true)
             get_secondary(
               tail,
               backup,
@@ -1055,11 +1061,11 @@ defmodule AddressUS.Parser do
       case {street_name, box, pre_direction, suffix, p_val, p_des, post_direction} do
         # TODO: Check on what addresses would make this occur
         {nil, b, _, _, _, _, _} when b != nil ->
-          {box, pre_direction, suffix, p_val, post_direction}
+          IO.inspect({box, pre_direction, suffix, p_val, post_direction}, label: "first case")
 
         # TODO: Check on what addresses would make this occur
         {nil, _, _, _, pv, nil, _} when pv != nil ->
-          {pv, pre_direction, suffix, nil, post_direction}
+          IO.inspect({pv, pre_direction, suffix, nil, post_direction}, label: "second case")
 
         # If the Suffix is St or Dr (which would never be valid street names) leave it at suffix
         {nil, _, pre, suf, _, _, _} when pre != nil and suf in ["St", "Dr"] ->
@@ -1090,6 +1096,8 @@ defmodule AddressUS.Parser do
     # CONSIDER: a final pass through the name looking for the last suffix and removing remaining to additional
     # However may hurt performance too much and cause false positives
     # 5875 CASTLE CREEK PKWY DR BLDG 4 STE 195 is a good test -- Bldg 4 should be removed to additional
+    # and 1040 A AVE FREEMAN FIELD
+    # and 9704 BEAUMONT RD MAINT BLDG
     {final_name, additional, suffix} =
       strip_additional_and_suffix_from_name(final_name, additional, suffix)
 
