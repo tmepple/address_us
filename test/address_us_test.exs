@@ -1606,4 +1606,15 @@ defmodule AddressUSTest do
 
     assert desired_result == parse_address_line("600 W Avenue B")
   end
+
+  # Test this works even if the avenue name looks like a post-direction
+  test "600 W Avenue E" do
+    desired_result = %Street{
+      name: "Avenue E",
+      primary_number: "600",
+      pre_direction: "W"
+    }
+
+    assert desired_result == parse_address_line("600 W Avenue B")
+  end
 end

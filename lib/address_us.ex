@@ -417,16 +417,23 @@ defmodule AddressUS.Parser do
   # {post_direction, leftover_address_list}.
   defp get_post_direction(address) when not is_list(address), do: {nil, nil, nil, nil}
   defp get_post_direction([]), do: {nil, nil, nil, nil}
-  defp get_post_direction(address), do: get_post_direction(address, nil, nil, false)
+  defp get_post_direction(address), do: get_post_direction(address, address, nil, nil, false)
 
-  defp get_post_direction(address, post_direction, raw_pd, true) do
+  defp get_post_direction(address, _backup, post_direction, raw_pd, true) do
     {post_direction, raw_pd, address}
   end
 
-  defp get_post_direction(address, post_direction, raw_pd, false) do
+  defp get_post_direction(address, backup, post_direction, raw_pd, false) do
     log_term({address, post_direction}, "get_post_direction_internals")
 
     [head | tail] = address
+
+    {tail_head, _tail_tail} =
+      case length(tail) do
+        0 -> {"", []}
+        1 -> {hd(tail), []}
+        _ -> {hd(tail), tl(tail)}
+      end
 
     detect_attached_post_direction = Regex.run(~r/^\d+([a-zA-Z])$/, head)
 
@@ -449,30 +456,28 @@ defmodule AddressUS.Parser do
     log_term({head, direction_value, new_direction, post_direction, address, tail}, "before cond")
 
     cond do
-      # attached_post_direction ->
-      #   get_post_direction(
-      #     [attached_post_direction | [String.slice(head, 0..-2) | tail]],
-      #     post_direction,
-      #     append_string(raw_pd, List.last(detect_attached_post_direction)),
-      #     false
-      #   )
-
       attached_post_direction ->
         get_post_direction(
           [attached_post_direction | [String.slice(head, 0..-2) | tail]],
+          backup,
           post_direction,
           append_string(raw_pd, head),
           false
         )
 
+      # Handle address like "1404 W Avenue E"
+      get_suffix_value(head) == "Ave" &&
+          (get_direction_value(tail_head) != "" or string_is_number_or_fraction?(tail_head)) ->
+        get_post_direction(backup, backup, nil, title_case(raw_pd), true)
+
       get_direction_value(head) == "" ->
-        get_post_direction(address, post_direction, title_case(raw_pd), true)
+        get_post_direction(address, backup, post_direction, title_case(raw_pd), true)
 
       address == [] ->
-        get_post_direction(address, new_direction, title_case(raw_pd), true)
+        get_post_direction(address, backup, new_direction, title_case(raw_pd), true)
 
       true ->
-        get_post_direction(tail, new_direction, append_string(raw_pd, head), false)
+        get_post_direction(tail, backup, new_direction, append_string(raw_pd, head), false)
     end
   end
 
