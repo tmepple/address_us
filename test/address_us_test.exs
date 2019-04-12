@@ -1547,4 +1547,30 @@ defmodule AddressUSTest do
 
     assert desired_result == parse_address_line("1332 State Road #2 West")
   end
+
+  # Don't discard unparseable additional information at end of address
+  test "15202 Edgerton Road T-209, New Haven, IN" do
+    desired_result = %Address{
+      city: "New Haven",
+      state: "IN",
+      street: %Street{
+        additional_designation: "T-209",
+        name: "Edgerton",
+        primary_number: "15202",
+        suffix: "Rd"
+      }
+    }
+
+    assert desired_result == parse_address("15202 Edgerton Road T-209, New Haven, IN")
+  end
+
+  test "1040 A Avenue" do
+    desired_result = %Street{
+      name: "A",
+      primary_number: "1040",
+      suffix: "Ave"
+    }
+
+    assert desired_result == parse_address_line("1040 A Avenue")
+  end
 end

@@ -311,12 +311,14 @@ defmodule AddressUS.Parser do
         _ -> {hd(tail), tl(tail)}
       end
 
-    next_is_number =
-      if length(tail) == 0 do
-        false
-      else
-        string_is_number_or_fraction?(hd(tail))
-      end
+    tail_tail_head = if length(tail_tail) > 0, do: hd(tail_tail), else: nil
+
+    # next_is_number =
+    #   if length(tail) == 0 do
+    #     false
+    #   else
+    #     string_is_number_or_fraction?(hd(tail))
+    #   end
 
     next_is_fraction =
       if length(tail) == 0 do
@@ -368,7 +370,11 @@ defmodule AddressUS.Parser do
             get_number(tail, backup, head, box, p_val, p_des, true)
 
           true ->
-            get_number(tail_tail, backup, head, box, safe_upcase(tail_head), p_des, true)
+            # If the term after the number is a single alphanumeric then check to see if the term after that is
+            # a valid suffix (i.e. 4400 A Avenue) before assuming it's a secondary_value
+            if get_suffix_value(tail_tail_head),
+              do: get_number(tail, backup, head, box, p_val, p_des, true),
+              else: get_number(tail_tail, backup, head, box, safe_upcase(tail_head), p_des, true)
         end
 
       number == nil && string_is_number_or_fraction?(safe_replace(head, regex, "\\1")) ->
@@ -538,37 +544,36 @@ defmodule AddressUS.Parser do
 
   # Parses out the secondary data from an address field and returns
   # {secondary_designator, secondary_value, private_mailbox_number,
-  # leftover_address_list}
-  defp get_secondary(address) when not is_list(address), do: {nil, nil, nil, []}
-  defp get_secondary([]), do: {nil, nil, nil, []}
+  # leftover_address_list, additional}
+  defp get_secondary(address, _addit) when not is_list(address), do: {nil, nil, nil, nil, []}
+  defp get_secondary([], additional), do: {nil, nil, nil, additional, []}
 
-  defp get_secondary(address) do
-    get_secondary(address, address, nil, nil, nil, false)
+  defp get_secondary(address, addit) do
+    get_secondary(address, address, nil, nil, nil, addit, false)
   end
 
-  defp get_secondary([], backup, _pmb, _designator, _number, false) do
-    {nil, nil, nil, backup}
+  defp get_secondary([], backup, _pmb, _designator, _number, addit, false) do
+    {nil, nil, nil, addit, backup}
   end
 
-  defp get_secondary(address, _backup, pmb, designator, value, true) do
+  defp get_secondary(address, _backup, pmb, designator, value, addit, true) do
     [_ | tail] = address
 
     cond do
       value == nil && pmb != nil ->
         clean_designator = safe_replace(designator, ",", "")
         clean_pmb = safe_replace(pmb, ",", "")
-        {clean_designator, nil, clean_pmb, tail}
+        {clean_designator, nil, clean_pmb, addit, tail}
 
       true ->
         clean_designator = safe_replace(designator, ",", "")
         clean_value = safe_replace(value, ",", "")
         clean_pmb = safe_replace(pmb, ",", "")
-        {clean_designator, clean_value, clean_pmb, address}
+        {clean_designator, clean_value, clean_pmb, addit, address}
     end
   end
 
-  defp get_secondary(address, backup, pmb, designator, value, false) do
-    # TODO: get secondary loses information in the case of "301 Main Boulevard Additional"
+  defp get_secondary(address, backup, pmb, designator, value, addit, false) do
     log_term({address, pmb, designator, value}, "get_secondary_internals")
     [head | tail] = address
 
@@ -587,32 +592,49 @@ defmodule AddressUS.Parser do
       string_is_number?(head) or string_starts_with_number?(head) ->
         cond do
           contains_po_box?(tail) || is_state?(tail_head) ->
-            get_secondary(tail, backup, pmb, designator, value, false)
+            Logger.debug("at 1")
+            get_secondary(tail, backup, pmb, designator, value, addit, false)
 
           tail_head == '&' ->
-            get_secondary(tail_tail, backup, pmb, designator, tail_head <> " " <> head, false)
+            Logger.debug("at 2")
+
+            get_secondary(
+              tail_tail,
+              backup,
+              pmb,
+              designator,
+              tail_head <> " " <> head,
+              addit,
+              false
+            )
 
           safe_starts_with?(value, "&") ->
-            get_secondary(tail, backup, pmb, designator, head, false)
+            Logger.debug("at 3")
+            get_secondary(tail, backup, pmb, designator, head, addit, false)
 
           tail_head == "#" ->
-            get_secondary(tail_tail, backup, pmb, designator, head, false)
+            Logger.debug("at 4")
+            get_secondary(tail_tail, backup, pmb, designator, head, addit, false)
 
           true ->
-            get_secondary(tail, backup, pmb, designator, head, false)
+            Logger.debug("at 5")
+            get_secondary(tail, backup, pmb, designator, head, addit, false)
         end
 
       safe_has_key?(units, title_case(head)) ->
         cond do
           safe_has_key?(suffixes, safe_upcase(value)) ->
-            get_secondary(backup, backup, nil, nil, nil, true)
+            Logger.debug("at 6")
+            get_secondary(backup, backup, nil, nil, nil, addit, true)
 
           true ->
-            get_secondary(tail, backup, pmb, Map.get(units, title_case(head)), value, true)
+            Logger.debug("at 7")
+            get_secondary(tail, backup, pmb, Map.get(units, title_case(head)), value, addit, true)
         end
 
       Map.values(units) |> Enum.member?(title_case(head)) ->
-        get_secondary(tail, backup, pmb, title_case(head), value, true)
+        Logger.debug("at 8")
+        get_secondary(tail, backup, pmb, title_case(head), value, addit, true)
 
       safe_starts_with?(head, "#") && !contains_po_box?(address) ->
         all_unit_values = Map.keys(units) ++ Map.values(units)
@@ -628,17 +650,30 @@ defmodule AddressUS.Parser do
                   Map.get(units, title_case(tail_head))
               end
 
+            Logger.debug("at 9")
+
             get_secondary(
               tail_tail,
               backup,
               pmb,
               secondary_unit,
               safe_replace(head, "#", ""),
+              addit,
               true
             )
 
           true ->
-            get_secondary(tail, backup, safe_replace(head, "#", ""), designator, value, false)
+            Logger.debug("at 10")
+
+            get_secondary(
+              tail,
+              backup,
+              safe_replace(head, "#", ""),
+              designator,
+              value,
+              addit,
+              false
+            )
         end
 
       value != nil && designator == nil ->
@@ -655,7 +690,8 @@ defmodule AddressUS.Parser do
                   Map.get(units, title_case(tail_head))
               end
 
-            get_secondary(tail_tail, backup, pmb, secondary_unit, head <> value, true)
+            Logger.debug("at 11")
+            get_secondary(tail_tail, backup, pmb, secondary_unit, head <> value, addit, true)
 
           Enum.member?(all_unit_values, title_case(head)) ->
             secondary_unit =
@@ -667,37 +703,55 @@ defmodule AddressUS.Parser do
                   Map.get(units, title_case(head))
               end
 
-            get_secondary(tail, backup, pmb, secondary_unit, value, true)
+            Logger.debug("at 12")
+            get_secondary(tail, backup, pmb, secondary_unit, value, addit, true)
 
           true ->
-            get_secondary(backup, backup, pmb, designator, nil, true)
+            Logger.debug("at 13")
+            get_secondary(backup, backup, pmb, designator, nil, addit, true)
         end
 
       is_possible_suite_number?(tail_head) &&
           (safe_has_key?(units, title_case(tail_head)) ||
              Map.values(units) |> Enum.member?(title_case(tail_head))) ->
-        get_secondary(tail, backup, pmb, designator, safe_replace(head, ",", ""), false)
+        Logger.debug("at 14")
+
+        get_secondary(tail, backup, pmb, designator, safe_replace(head, ",", ""), addit, false)
 
       get_suffix_value(tail_head) != nil && get_suffix_value(head) == nil ->
         cond do
           is_possible_suite_number?(head) &&
               (String.length(tail_tail) < 2 ||
                  String.upcase(hd(tail_tail)) == "STATE") ->
-            get_secondary(backup, backup, pmb, designator, value, true)
+            Logger.debug("at 15")
+            get_secondary(backup, backup, pmb, designator, value, addit, true)
 
           Map.values(directions) |> Enum.member?(safe_upcase(head)) ||
               safe_has_key?(directions, title_case(head)) ->
-            get_secondary(backup, backup, pmb, designator, value, true)
+            Logger.debug("at 16")
+            get_secondary(backup, backup, pmb, designator, value, addit, true)
 
           true ->
-            get_secondary(tail, backup, pmb, designator, value, true)
+            Logger.debug("at 17")
+
+            get_secondary(
+              tail,
+              backup,
+              pmb,
+              designator,
+              value,
+              append_string_with_space(addit, head),
+              true
+            )
         end
 
       tail_head == "&" ->
-        get_secondary(tail_tail, backup, pmb, designator, value, false)
+        Logger.debug("at 18")
+        get_secondary(tail_tail, backup, pmb, designator, value, addit, false)
 
       true ->
-        get_secondary(backup, backup, pmb, designator, value, true)
+        Logger.debug("at 19")
+        get_secondary(backup, backup, pmb, designator, value, addit, true)
     end
   end
 
@@ -966,8 +1020,8 @@ defmodule AddressUS.Parser do
       get_trailing_parens(cleaned_address)
       |> log_term("get_trailing_parens")
 
-    {designator, value, pmb, address_no_secondary} =
-      get_secondary(address_no_trailing_parens)
+    {designator, value, pmb, additional, address_no_secondary} =
+      get_secondary(address_no_trailing_parens, additional)
       |> log_term("get_secondary")
 
     {post_direction, raw_post_direction, address_no_secondary_direction} =
@@ -1033,6 +1087,9 @@ defmodule AddressUS.Parser do
     log_term({final_name, final_secondary_val}, "final_name, secondary_val")
 
     # In case the suffix wasn't parsed out due to extraneous designations still present in the street name
+    # CONSIDER: a final pass through the name looking for the last suffix and removing remaining to additional
+    # However may hurt performance too much and cause false positives
+    # 5875 CASTLE CREEK PKWY DR BLDG 4 STE 195 is a good test -- Bldg 4 should be removed to additional
     {final_name, additional, suffix} =
       strip_additional_and_suffix_from_name(final_name, additional, suffix)
 
@@ -1108,6 +1165,14 @@ defmodule AddressUS.Parser do
 
   defp append_string(str1, str2) do
     String.trim(str1) <> String.trim(String.replace_prefix(str2, "-", ""))
+  end
+
+  defp append_string_with_space(nil, str) do
+    String.trim(str) |> String.replace_prefix("-", "")
+  end
+
+  defp append_string_with_space(str1, str2) do
+    String.trim(str1) <> " " <> String.trim(String.replace_prefix(str2, "-", ""))
   end
 
   # Cleans up hyphenated street values by removing the hyphen and returing the
