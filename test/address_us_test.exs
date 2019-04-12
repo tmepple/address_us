@@ -1585,4 +1585,15 @@ defmodule AddressUSTest do
 
     assert desired_result == parse_address_line("201 E MAIN ST BOX 291")
   end
+
+  # 2 pre-directions when combined are invalid
+  test "3977 W N MICHIGAN RD" do
+    desired_result = %Street{
+      name: "W N Michigan",
+      primary_number: "3977",
+      suffix: "Rd"
+    }
+
+    assert desired_result == parse_address_line("3977 W N MICHIGAN RD")
+  end
 end

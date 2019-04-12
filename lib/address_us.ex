@@ -521,20 +521,34 @@ defmodule AddressUS.Parser do
     cond do
       single_word_direction != "" && next_is_direction &&
           tail_tail_head_is_keyword ->
+        IO.puts("at 1")
         {single_word_direction, title_case(head), tail}
 
       single_word_direction != "" && next_is_direction &&
           tail_tail_head == nil ->
+        IO.puts("at 2")
+
         {single_word_direction, title_case(head), tail}
 
       single_word_direction != "" && next_is_direction &&
-          !tail_tail_head_is_keyword ->
+        !tail_tail_head_is_keyword && double_word_direction != "" ->
+        IO.puts("at 3")
+
         {double_word_direction, title_case(head <> tail_head), tail_tail}
+
+      # Following case happens with an illegal double direction (i.e. W N Michigan Rd)
+      # Since it's an illegal direction we punt so these terms are pre-pended to the street name
+      single_word_direction != "" && next_is_direction &&
+          !tail_tail_head_is_keyword ->
+        IO.puts("at 4")
+        {nil, nil, address}
 
       # single_word_direction != "" && tail == [] ->
       #   {nil, address}
 
       single_word_direction != "" ->
+        IO.puts("at 5")
+
         {single_word_direction, title_case(head), tail}
 
       true ->
