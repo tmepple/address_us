@@ -428,6 +428,8 @@ defmodule AddressUS.Parser do
 
     [head | tail] = address
 
+    address_length = length(address)
+
     {tail_head, _tail_tail} =
       case length(tail) do
         0 -> {"", []}
@@ -470,11 +472,13 @@ defmodule AddressUS.Parser do
           (get_direction_value(tail_head) != "" or string_is_number_or_fraction?(tail_head)) ->
         get_post_direction(backup, backup, nil, title_case(raw_pd), true)
 
+      # If there is only one term left (an address number) then we likely were too aggressive about
+      # and we are not dealing with a post_direction anyway i.e. "101 W North" 
+      address_length == 1 ->
+        get_post_direction(backup, backup, nil, title_case(raw_pd), true)
+
       get_direction_value(head) == "" ->
         get_post_direction(address, backup, post_direction, title_case(raw_pd), true)
-
-      address == [] ->
-        get_post_direction(address, backup, new_direction, title_case(raw_pd), true)
 
       true ->
         get_post_direction(tail, backup, new_direction, append_string(raw_pd, head), false)
@@ -1354,6 +1358,7 @@ defmodule AddressUS.Parser do
     |> safe_replace(~r/US$/, "")
     |> safe_replace(~r/\(SEC\)/, "")
     |> safe_replace(~r/U\.S\./, "US")
+    |> safe_replace(~r/\sU\sS\s/, " US ")
     |> safe_replace(~r/\sM L King\s/, " Martin Luther King ")
     |> safe_replace(~r/\sMLK\s/, " Martin Luther King ")
     |> safe_replace(~r/\sMLKING\s/, " Martin Luther King ")

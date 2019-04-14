@@ -1615,6 +1615,24 @@ defmodule AddressUSTest do
       pre_direction: "W"
     }
 
-    assert desired_result == parse_address_line("600 W Avenue B")
+    assert desired_result == parse_address_line("600 W Avenue E")
+  end
+
+  test "154 W U S 30" do
+    desired_result = %Street{
+      name: "US Hwy 30",
+      primary_number: "154",
+      pre_direction: "W"
+    }
+
+    assert desired_result == parse_address_line("154 W U S 30")
+  end
+
+  test "101 W North" do
+    desired_result = %Street{
+      name: "North",
+      pre_direction: "W",
+      primary_number: "101"
+    }
   end
 end
