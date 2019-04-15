@@ -1008,27 +1008,30 @@ defmodule AddressUS.Parser do
   defp strip_additional_and_suffix_from_name(street_name, additional, suffix) do
     {street_name, additional, suffix}
     |> safe_replace_first_elem(~r/\#/, "")
+    |> strip_regex_to_additional(~r/( |\-)Po Box \w+$/)
+    |> strip_regex_to_additional(~r/( |\-)Box \w+$/)
+    |> strip_regex_to_additional(~r/( |\-)Milepost (\w|\.)+$/)
     |> strip_embedded_suffix()
   end
 
-  # TODO: No longer in use -- can remove
-  # defp strip_regex_to_additional({nil, _, _} = tuple, _regex), do: tuple
+  defp strip_regex_to_additional({nil, _, _} = tuple, _regex), do: tuple
 
-  # defp strip_regex_to_additional({street_name, additional, suffix} = tuple, regex) do
-  #   parts = Regex.split(regex, street_name, include_captures: true)
+  defp strip_regex_to_additional({street_name, additional, suffix} = tuple, regex) do
+    parts = Regex.split(regex, street_name, include_captures: true)
 
-  #   if length(parts) == 1 do
-  #     tuple
-  #   else
-  #     {List.first(parts), append_string(additional, Enum.at(parts, 1)), suffix}
-  #   end
-  # end
+    if length(parts) == 1 do
+      tuple
+    else
+      {List.first(parts), append_string(additional, Enum.at(parts, 1)), suffix}
+    end
+  end
 
   defp strip_embedded_suffix({street_name, additional, nil} = tuple)
        when not is_nil(street_name) do
-    suf_list = Map.keys(AddressUSConfig.common_suffixes()) |> Enum.map(fn x -> " " <> x end)
+    suf_list =
+      Map.keys(AddressUSConfig.common_suffixes()) |> Enum.map(fn x -> " " <> x <> " " end)
 
-    upcase_street = String.upcase(street_name)
+    upcase_street = String.upcase(street_name) <> " "
 
     case :binary.match(upcase_street, suf_list) do
       {0, _} ->
@@ -1040,8 +1043,8 @@ defmodule AddressUS.Parser do
         b = String.trim(b)
 
         cond do
-          c == "" ->
-            tuple
+          # c == "" ->
+          #   tuple
 
           String.ends_with?(a, ["COUNTY", "STATE", "US"]) ->
             tuple
@@ -1136,12 +1139,16 @@ defmodule AddressUS.Parser do
 
         # Otherwise if the suffix is something else (like Blvd, Ct, etc) and there is a pre-direction
         # It's too ambiguous (i.e. 1410 East Boulevard or 720 Northwest Blvd) we we will just put both
-        # identifiers in the name field
+        # identifiers in the name field.  
+        # Note we are loading suffix with * in this case to avoid having it pulled back out by strip_additional_and_suffix_from_name
+        # The * will be nilified after that function.
         {nil, _, pre, suf, _, _, _} when pre != nil and suf != nil ->
-          {raw_pre_direction <> " " <> raw_suffix, nil, nil, p_val, post_direction}
+          {raw_pre_direction <> " " <> raw_suffix, nil, "*", p_val, post_direction}
 
+        # Note we are loading suffix with * in this case to avoid having it pulled back out by strip_additional_and_suffix_from_name
+        # The * will be nilified after that function.
         {nil, _, _pre, suf, _, _, _} when suf != nil ->
-          {raw_suffix, pre_direction, nil, p_val, post_direction}
+          {raw_suffix, pre_direction, "*", p_val, post_direction}
 
         {nil, _, pre, _suf, _, _, _} when pre != nil ->
           {raw_pre_direction, nil, suffix, p_val, post_direction}
@@ -1163,6 +1170,8 @@ defmodule AddressUS.Parser do
     # and 9704 BEAUMONT RD MAINT BLDG
     {final_name, additional, suffix} =
       strip_additional_and_suffix_from_name(final_name, additional, suffix)
+
+    suffix = if suffix == "*", do: nil, else: suffix
 
     # If a post-direction was mistakenly taken from a Box, append it back on
     {final_name, post_direction} =
