@@ -1642,10 +1642,21 @@ defmodule AddressUSTest do
     desired_result = %Street{
       name: "Patterson",
       suffix: "St",
-      additional_designation: "PO Box 496",
+      additional_designation: "Po Box 496",
       primary_number: "2709"
     }
 
     assert desired_result == parse_address_line("2709 PATTERSON ST. P.O.BOX 496")
+  end
+
+  test "2215 N STATE ROAD 3 BYPASS" do
+    desired_result = %Street{
+      name: "State Road 3",
+      primary_number: "2215",
+      suffix: "Byp",
+      pre_direction: "N"
+    }
+
+    assert desired_result == parse_address_line("2215 N STATE ROAD 3 BYPASS")
   end
 end

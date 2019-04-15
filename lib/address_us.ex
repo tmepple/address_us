@@ -1401,6 +1401,7 @@ defmodule AddressUS.Parser do
     # remove periods that are not adjacent to digits
     |> safe_replace(~r/(?!\d)\.(?!\d)/, "")
     |> safe_replace(~r/(?i)P O BOX/, "PO BOX")
+    |> safe_replace(~r/PO BOX(\d+)/, "PO BOX \\1")
     |> safe_replace(~r/\s,\s/, ", ")
     |> String.trim()
   end
