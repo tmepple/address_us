@@ -866,7 +866,8 @@ defmodule AddressUSTest do
         primary_number: "4423",
         pre_direction: "E",
         secondary_designator: "Ste",
-        secondary_value: "B"
+        secondary_value: "B",
+        additional_designation: "(sec)"
       }
     }
 
@@ -898,7 +899,7 @@ defmodule AddressUSTest do
       city: "Clayton",
       state: "NC",
       postal: "27520",
-      street: %Street{name: "US Hwy 70", primary_number: "11681"}
+      street: %Street{name: "US Highway 70", primary_number: "11681"}
     }
 
     result = parse_address("11681 US HWY 70, Clayton, NC 27520")
@@ -1393,7 +1394,7 @@ defmodule AddressUSTest do
       state: "IN",
       postal: "47341",
       street: %Street{
-        name: "US Hwy 27",
+        name: "US Highway 27",
         primary_number: "114",
         post_direction: "N"
       }
@@ -1620,7 +1621,7 @@ defmodule AddressUSTest do
 
   test "154 W U S 30" do
     desired_result = %Street{
-      name: "US Hwy 30",
+      name: "US Highway 30",
       primary_number: "154",
       pre_direction: "W"
     }
@@ -1658,5 +1659,21 @@ defmodule AddressUSTest do
     }
 
     assert desired_result == parse_address_line("2215 N STATE ROAD 3 BYPASS")
+  end
+
+  test "1040 A AVE FREEMAN FIELD" do
+    desired_result = %Street{
+      additional_designation: "Freeman Field",
+      name: "A",
+      pmb: nil,
+      post_direction: nil,
+      pre_direction: nil,
+      primary_number: "1040",
+      secondary_designator: nil,
+      secondary_value: nil,
+      suffix: "Ave"
+    }
+
+    assert desired_result == parse_address_line("1040 A AVE FREEMAN FIELD")
   end
 end

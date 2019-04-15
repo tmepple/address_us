@@ -54,6 +54,7 @@ defmodule AddressUS.Parser do
 
   def parse_address(messy_address) do
     address = standardize_address(messy_address)
+    log_term(address, "std addr")
     {postal, plus_4, address_no_postal} = get_postal(address)
     {state, address_no_state} = get_state(address_no_postal)
     {city, address_no_city} = get_city(address_no_state)
@@ -1007,39 +1008,72 @@ defmodule AddressUS.Parser do
   defp strip_additional_and_suffix_from_name(street_name, additional, suffix) do
     {street_name, additional, suffix}
     |> safe_replace_first_elem(~r/\#/, "")
-    |> strip_regex_to_additional(~r/( |\-)Po Box \w+$/)
-    |> strip_regex_to_additional(~r/( |\-)Box \w+$/)
-    |> strip_regex_to_additional(~r/( |\-)Milepost (\w|\.)+$/)
-    |> strip_suffix()
+    |> strip_embedded_suffix()
   end
 
-  defp strip_regex_to_additional({nil, _, _} = tuple, _regex), do: tuple
+  # TODO: No longer in use -- can remove
+  # defp strip_regex_to_additional({nil, _, _} = tuple, _regex), do: tuple
 
-  defp strip_regex_to_additional({street_name, additional, suffix} = tuple, regex) do
-    parts = Regex.split(regex, street_name, include_captures: true)
+  # defp strip_regex_to_additional({street_name, additional, suffix} = tuple, regex) do
+  #   parts = Regex.split(regex, street_name, include_captures: true)
 
-    if length(parts) == 1 do
-      tuple
-    else
-      {List.first(parts), append_string(additional, Enum.at(parts, 1)), suffix}
+  #   if length(parts) == 1 do
+  #     tuple
+  #   else
+  #     {List.first(parts), append_string(additional, Enum.at(parts, 1)), suffix}
+  #   end
+  # end
+
+  defp strip_embedded_suffix({street_name, additional, nil} = tuple)
+       when not is_nil(street_name) do
+    suf_list = Map.keys(AddressUSConfig.common_suffixes()) |> Enum.map(fn x -> " " <> x end)
+
+    upcase_street = String.upcase(street_name)
+
+    case :binary.match(upcase_street, suf_list) do
+      {0, _} ->
+        tuple
+
+      {start, length} ->
+        <<a::binary-size(start), b::binary-size(length), c::binary>> = upcase_street
+        a = String.trim(a)
+        b = String.trim(b)
+
+        cond do
+          c == "" ->
+            tuple
+
+          String.ends_with?(a, ["COUNTY", "STATE", "US"]) ->
+            tuple
+
+          true ->
+            {title_case(a), append_string_with_space(additional, title_case(c)),
+             get_suffix_value(b)}
+        end
+
+      :nomatch ->
+        tuple
     end
   end
 
-  # A suffix could still be embedded in the street_name at this point if additional designations exist
-  defp strip_suffix({street_name, additional, nil} = tuple) when not is_nil(additional) do
-    {suffix, _, addr_list} = street_name |> String.split(" ") |> Enum.reverse() |> get_suffix()
+  defp strip_embedded_suffix(tuple), do: tuple
 
-    if suffix != nil do
-      {Enum.reverse(addr_list) |> Enum.join(" "), additional, suffix}
-    else
-      tuple
-    end
-  end
+  # TODO: Remove - no longer used
+  # suffix could still be the last term of the street_name at this point if additional designations exist
+  # defp strip_suffix({street_name, additional, nil} = tuple) when not is_nil(additional) do
+  #   {suffix, _, addr_list} = street_name |> String.split(" ") |> Enum.reverse() |> get_suffix()
 
-  defp strip_suffix(tuple), do: tuple
+  #   if suffix != nil do
+  #     {Enum.reverse(addr_list) |> Enum.join(" "), additional, suffix}
+  #   else
+  #     tuple
+  #   end
+  # end
+
+  # defp strip_suffix(tuple), do: tuple
 
   # Parses an address list for all of the requisite address parts and returns
-  # a Street module.
+  # a Street struct.
   # p_val = possible secondary value
   # p_des = possible secondary designator
   defp parse_address_list(address) when not is_list(address), do: nil
@@ -1209,7 +1243,8 @@ defmodule AddressUS.Parser do
   end
 
   defp append_string_with_space(str1, str2) do
-    String.trim(str1) <> " " <> String.trim(String.replace_prefix(str2, "-", ""))
+    (String.trim(str1) <> " " <> String.trim(String.replace_prefix(str2, "-", "")))
+    |> String.trim()
   end
 
   # Cleans up hyphenated street values by removing the hyphen and returing the
@@ -1352,11 +1387,11 @@ defmodule AddressUS.Parser do
 
   defp standardize_address(address) do
     address
-    |> safe_replace(~r/ United States$/, "")
-    |> safe_replace(~r/ UNITED STATES$/, "")
+    # |> safe_replace(~r/ United States$/, "")
+    |> safe_replace(~r/ UNITED STATES$/i, "")
     |> safe_replace(~r/ US$/, "")
-    |> safe_replace(~r/US$/, "")
-    |> safe_replace(~r/\(SEC\)/, "")
+    # |> safe_replace(~r/US$/, "")
+    # |> safe_replace(~r/\(SEC\)/, "")
     |> safe_replace(~r/U\.S\./, "US")
     |> safe_replace(~r/\sU\sS\s/, " US ")
     |> safe_replace(~r/\sM L King\s/, " Martin Luther King ")
@@ -1367,21 +1402,24 @@ defmodule AddressUS.Parser do
     |> safe_replace(~r/\)(.+)/, ") \\1")
     # NOTE: Don't remove parenthesis yet
     # |> safe_replace(~r/\((.+)\)/, "\\1")
-    |> safe_replace(~r/(?i)\sAND\s/, "&")
-    |> safe_replace(~r/(?i)\sI.E.\s/, "")
-    |> safe_replace(~r/(?i)\sET\sAL\s/, "")
-    |> safe_replace(~r/(?i)\sIN\sCARE\sOF\s/, "")
-    |> safe_replace(~r/(?i)\sCARE\sOF\s/, "")
-    |> safe_replace(~r/(?i)\sBY\sPASS\b/, " BYPASS ")
-    |> safe_replace(~r/(?i)\sBY\s/, "")
-    |> safe_replace(~r/(?i)\sFOR\s/, "")
-    |> safe_replace(~r/(?i)\sALSO\s/, "")
-    |> safe_replace(~r/(?i)\sATTENTION\s/, "")
-    |> safe_replace(~r/(?i)\sATTN\s/, "")
-    |> safe_replace(~r/(?i)\ss#\ss(\S)/, " #\\1")
+    |> safe_replace(~r/\sAND\s/i, "&")
+    |> safe_replace(~r/\sI.E.\s/i, "")
+    |> safe_replace(~r/\sET\sAL\s/i, "")
+    |> safe_replace(~r/\sIN\sCARE\sOF\s/i, "")
+    |> safe_replace(~r/\sCARE\sOF\s/i, "")
+    |> safe_replace(~r/\sBY\sPASS\b/i, " BYPASS ")
+    |> safe_replace(~r/\sBY\s/i, "")
+    |> safe_replace(~r/\sFOR\s/i, "")
+    |> safe_replace(~r/\sALSO\s/i, "")
+    |> safe_replace(~r/\sATTENTION\s/i, "")
+    |> safe_replace(~r/\sATTN\s/i, "")
+    |> safe_replace(~r/\ss#\ss(\S)/i, " #\\1")
     # |> safe_replace(~r/(?i)P O BOX/, "PO BOX")
-    |> safe_replace(~r/(?i)US (\d+)/, "US Hwy \\1")
-    |> safe_replace(~r/(?i)(\d+) Hwy (\d+)/, "\\1 Highway \\2")
+    |> safe_replace(~r/\bUS (\d+)/i, "US Highway \\1")
+    |> safe_replace(~r/\bUS Hwy (\d+)/i, "US Highway \\1")
+    |> safe_replace(~r/(\d+) Hwy (\d+)/i, "\\1 Highway \\2")
+    |> safe_replace(~r/\bCR (\d+)/i, "County Road \\1")
+    |> safe_replace(~r/\bCO RD (\d+)/i, "County Road \\1")
     |> safe_replace(~r/(.+)#/, "\\1 #")
     |> safe_replace(~r/\n/, ", ")
     |> safe_replace(~r/\t/, " ")
