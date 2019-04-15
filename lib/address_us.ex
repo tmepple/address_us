@@ -1026,40 +1026,55 @@ defmodule AddressUS.Parser do
     end
   end
 
-  defp strip_embedded_suffix({street_name, additional, nil} = tuple)
-       when not is_nil(street_name) do
-    suf_list =
-      Map.keys(AddressUSConfig.common_suffixes()) |> Enum.map(fn x -> " " <> x <> " " end)
+  def strip_embedded_suffix({street_name, additional, nil} = tuple)
+      when not is_nil(street_name) do
+    ucase_street_name = String.upcase(street_name)
 
-    upcase_street = String.upcase(street_name) <> " "
+    # CONSIDER: For performance we could hardcode the keys in a separate list
+    suf_list = Map.keys(AddressUSConfig.common_suffixes())
 
-    case :binary.match(upcase_street, suf_list) do
-      {0, _} ->
-        tuple
+    # Checking if the string contains a suffix string before going through the expensive operation
+    if String.contains?(ucase_street_name, suf_list) do
+      rev_street_list = ucase_street_name |> String.split(" ") |> Enum.reverse()
 
-      {start, length} ->
-        <<a::binary-size(start), b::binary-size(length), c::binary>> = upcase_street
-        a = String.trim(a)
-        b = String.trim(b)
+      rev_last_suffix_index =
+        Enum.find_index(rev_street_list, fn x -> Enum.member?(suf_list, x) end)
 
-        cond do
-          # c == "" ->
-          #   tuple
+      cond do
+        rev_last_suffix_index == nil ->
+          tuple
 
-          String.ends_with?(a, ["COUNTY", "STATE", "US"]) ->
-            tuple
+        # If the first term in the street name is a suffix then ignore (as it's really the street name)
+        rev_last_suffix_index == length(rev_street_list) - 1 ->
+          tuple
 
-          true ->
-            {title_case(a), append_string_with_space(additional, title_case(c)),
-             get_suffix_value(b)}
-        end
+        # Don't mangle Highways
+        Enum.member?(
+          ["COUNTY", "STATE", "US"],
+          Enum.at(rev_street_list, rev_last_suffix_index + 1)
+        ) ->
+          tuple
 
-      :nomatch ->
-        tuple
+        true ->
+          street_list = Enum.reverse(rev_street_list)
+          last_suffix_index = length(street_list) - 1 - rev_last_suffix_index
+          ret_street = Enum.take(street_list, last_suffix_index) |> Enum.join(" ") |> title_case()
+          ret_suffix = get_suffix_value(Enum.at(street_list, last_suffix_index))
+
+          new_addtl =
+            Enum.take(street_list, (length(street_list) - (last_suffix_index + 1)) * -1)
+            |> Enum.join(" ")
+            |> title_case()
+
+          ret_addtl = append_string_with_space(additional, new_addtl)
+          {ret_street, ret_addtl, ret_suffix}
+      end
+    else
+      tuple
     end
   end
 
-  defp strip_embedded_suffix(tuple), do: tuple
+  def strip_embedded_suffix(tuple), do: tuple
 
   # TODO: Remove - no longer used
   # suffix could still be the last term of the street_name at this point if additional designations exist

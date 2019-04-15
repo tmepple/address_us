@@ -1665,15 +1665,23 @@ defmodule AddressUSTest do
     desired_result = %Street{
       additional_designation: "Freeman Field",
       name: "A",
-      pmb: nil,
-      post_direction: nil,
-      pre_direction: nil,
       primary_number: "1040",
-      secondary_designator: nil,
-      secondary_value: nil,
       suffix: "Ave"
     }
 
     assert desired_result == parse_address_line("1040 A AVE FREEMAN FIELD")
+  end
+
+  test "5875 CASTLE CREEK PKWY DR BLDG 4 STE 195" do
+    desired_result = %Street{
+      additional_designation: "Bldg 4",
+      name: "Castle Creek Pkwy",
+      primary_number: "5875",
+      secondary_designator: "Ste",
+      secondary_value: "195",
+      suffix: "Dr"
+    }
+
+    assert desired_result == parse_address_line("5875 CASTLE CREEK PKWY DR BLDG 4 STE 195")
   end
 end
