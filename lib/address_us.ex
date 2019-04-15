@@ -58,7 +58,7 @@ defmodule AddressUS.Parser do
     {postal, plus_4, address_no_postal} = get_postal(address)
     {state, address_no_state} = get_state(address_no_postal)
     {city, address_no_city} = get_city(address_no_state)
-    street = parse_address_list(address_no_city)
+    street = parse_address_list(address_no_city, state)
 
     %Address{postal: postal, plus_4: plus_4, state: state, city: city, street: street}
   end
@@ -80,7 +80,23 @@ defmodule AddressUS.Parser do
     |> log_term("std addr")
     |> String.split(" ")
     |> Enum.reverse()
-    |> parse_address_list()
+    |> parse_address_list("")
+  end
+
+  @doc """
+  Standardizes the raw street portion of an address according to USPS suggestions for
+  address parsing.  If given a state will apply custom standardizations (if they exist) for that state 
+  """
+  def standardize_address_line(messy_address, state \\ "")
+
+  def standardize_address_line(messy_address, _state) when not is_binary(messy_address), do: nil
+
+  def standardize_address_line(messy_address, state) do
+    messy_address
+    |> standardize_address()
+    |> standardize_highways(state)
+    |> safe_replace("_", " ")
+    |> title_case()
   end
 
   @doc """
@@ -1011,12 +1027,15 @@ defmodule AddressUS.Parser do
   # Additional designations and suffixes could be present in the final processed street name
   # This function isn't intended to solve all of these cases but common ones are covered
   defp strip_additional_and_suffix_from_name(street_name, additional, suffix) do
-    {street_name, additional, suffix}
-    |> safe_replace_first_elem(~r/\#/, "")
-    |> strip_regex_to_additional(~r/( |\-)Po Box \w+$/)
-    |> strip_regex_to_additional(~r/( |\-)Box \w+$/)
-    |> strip_regex_to_additional(~r/( |\-)Milepost (\w|\.)+$/)
-    |> strip_embedded_suffix()
+    {st, ad, su} =
+      {street_name, additional, suffix}
+      # |> safe_replace_first_elem(~r/\#/, "")
+      |> strip_regex_to_additional(~r/( |\-)Po Box \w+$/)
+      |> strip_regex_to_additional(~r/( |\-)Box \w+$/)
+      |> strip_regex_to_additional(~r/( |\-)Milepost (\w|\.)+$/)
+      |> strip_embedded_suffix()
+
+    {safe_replace(st, "_", " "), safe_replace(ad, "_", " ") |> title_case(), su}
   end
 
   defp strip_regex_to_additional({nil, _, _} = tuple, _regex), do: tuple
@@ -1031,19 +1050,57 @@ defmodule AddressUS.Parser do
     end
   end
 
+  def standardize_highways(street_name, state) do
+    street_name
+    |> safe_replace(~r/\#/, "")
+    |> safe_replace(~r/\bUS (\d+)/i, "US_Highway_\\1")
+    |> safe_replace(~r/\bUS (Hwy|Highway) (\d+)/i, "US_Highway_\\2")
+    # |> safe_replace(~r/\bUS Highway (\d+)/i, "US_Highway_\\1")
+    |> safe_replace(~r/(\d+) (Hwy|Highway) (\d+)/i, "\\1 Highway_\\2")
+    |> safe_replace(~r/\bCR (\d+)/i, "County_Road_\\1")
+    |> safe_replace(~r/\bCO (RD|ROAD) (\d+)/i, "County_Road_\\2")
+    |> safe_replace(~r/\bCH (\d+|[A-Z]+)/i, "County_Highway_\\1")
+    |> safe_replace(~r/\bSTATE (RD|ROAD) (\d+)/i, "State_Road_\\2")
+    |> safe_replace(~r/\bST (RD|ROAD) (\d+)/i, "State_Road_\\2")
+    # TODO: In certain states, change this to State Route instead
+    |> safe_replace(~r/\bSR (\d+)/i, standardize_sr(state))
+  end
+
+  defp standardize_sr(state) when state in ["CA", "TN"], do: "State_Route_\\1"
+
+  defp standardize_sr(_state), do: "State_Road_\\1"
+
+  def get_valid_suffix_index(street_list) do
+    Enum.with_index(street_list)
+    |> Enum.reduce_while({"", -1}, &test_suffix/2)
+    |> case do
+      tuple when is_tuple(tuple) -> nil
+      idx when is_integer(idx) -> idx
+      _ -> nil
+    end
+  end
+
+  def test_suffix(current, last) do
+    if Enum.member?(AddressUSConfig.common_suffix_keys(), elem(last, 0)) do
+      # NO LONGER NEEDED
+      # && not Enum.member?(["COUNTY", "STATE", "US"], elem(current, 0)) do
+      {:halt, elem(last, 1)}
+    else
+      {:cont, current}
+    end
+  end
+
   def strip_embedded_suffix({street_name, additional, nil} = tuple)
       when not is_nil(street_name) do
     ucase_street_name = String.upcase(street_name)
 
-    # CONSIDER: For performance we could hardcode the keys in a separate list
-    suf_list = Map.keys(AddressUSConfig.common_suffixes())
-
     # Checking if the string contains a suffix string before going through the expensive operation
-    if String.contains?(ucase_street_name, suf_list) do
+    if String.contains?(ucase_street_name, AddressUSConfig.common_suffix_keys()) do
       rev_street_list = ucase_street_name |> String.split(" ") |> Enum.reverse()
 
-      rev_last_suffix_index =
-        Enum.find_index(rev_street_list, fn x -> Enum.member?(suf_list, x) end)
+      # rev_last_suffix_index =
+      #   Enum.find_index(rev_street_list, fn x -> Enum.member?(suf_list, x) end)
+      rev_last_suffix_index = get_valid_suffix_index(rev_street_list)
 
       cond do
         rev_last_suffix_index == nil ->
@@ -1053,12 +1110,14 @@ defmodule AddressUS.Parser do
         rev_last_suffix_index == length(rev_street_list) - 1 ->
           tuple
 
+        # TODO: REMOVE - NO LONGER NEEDED
         # Don't mangle Highways
-        Enum.member?(
-          ["COUNTY", "STATE", "US"],
-          Enum.at(rev_street_list, rev_last_suffix_index + 1)
-        ) ->
-          tuple
+        # Enum.member?(
+        #   ["COUNTY", "STATE", "US"],
+        #   Enum.at(rev_street_list, rev_last_suffix_index + 1)
+        # ) ->
+        #   IO.puts("here!")
+        #   tuple
 
         true ->
           street_list = Enum.reverse(rev_street_list)
@@ -1081,29 +1140,15 @@ defmodule AddressUS.Parser do
 
   def strip_embedded_suffix(tuple), do: tuple
 
-  # TODO: Remove - no longer used
-  # suffix could still be the last term of the street_name at this point if additional designations exist
-  # defp strip_suffix({street_name, additional, nil} = tuple) when not is_nil(additional) do
-  #   {suffix, _, addr_list} = street_name |> String.split(" ") |> Enum.reverse() |> get_suffix()
-
-  #   if suffix != nil do
-  #     {Enum.reverse(addr_list) |> Enum.join(" "), additional, suffix}
-  #   else
-  #     tuple
-  #   end
-  # end
-
-  # defp strip_suffix(tuple), do: tuple
-
   # Parses an address list for all of the requisite address parts and returns
   # a Street struct.
   # p_val = possible secondary value
   # p_des = possible secondary designator
-  defp parse_address_list(address) when not is_list(address), do: nil
-  defp parse_address_list([]), do: nil
-  defp parse_address_list([""]), do: nil
+  defp parse_address_list(address, _state) when not is_list(address), do: nil
+  defp parse_address_list([], _), do: nil
+  defp parse_address_list([""], _), do: nil
 
-  defp parse_address_list(address) do
+  defp parse_address_list(address, state) do
     cleaned_address =
       Enum.map(address, &safe_replace(&1, ",", ""))
       |> log_term("cleaned")
@@ -1182,9 +1227,9 @@ defmodule AddressUS.Parser do
 
     log_term({final_name, final_secondary_val}, "final_name, secondary_val")
 
+    final_name = standardize_highways(final_name, state)
+
     # In case the suffix wasn't parsed out due to extraneous designations still present in the street name
-    # CONSIDER: a final pass through the name looking for the last suffix and removing remaining to additional
-    # However may hurt performance too much and cause false positives
     # 5875 CASTLE CREEK PKWY DR BLDG 4 STE 195 is a good test -- Bldg 4 should be removed to additional
     # and 1040 A AVE FREEMAN FIELD
     # and 9704 BEAUMONT RD MAINT BLDG
@@ -1436,6 +1481,8 @@ defmodule AddressUS.Parser do
     |> safe_replace(~r/\sET\sAL\s/i, "")
     |> safe_replace(~r/\sIN\sCARE\sOF\s/i, "")
     |> safe_replace(~r/\sCARE\sOF\s/i, "")
+    # C/O is Care Of
+    |> safe_replace(~r/C\/O\s/i, "")
     |> safe_replace(~r/\sBY\sPASS\b/i, " BYPASS ")
     |> safe_replace(~r/\sBY\s/i, "")
     |> safe_replace(~r/\sFOR\s/i, "")
@@ -1443,15 +1490,21 @@ defmodule AddressUS.Parser do
     |> safe_replace(~r/\sATTENTION\s/i, "")
     |> safe_replace(~r/\sATTN\s/i, "")
     |> safe_replace(~r/\ss#\ss(\S)/i, " #\\1")
-    # |> safe_replace(~r/(?i)P O BOX/, "PO BOX")
-    |> safe_replace(~r/\bUS (\d+)/i, "US Highway \\1")
-    |> safe_replace(~r/\bUS Hwy (\d+)/i, "US Highway \\1")
-    |> safe_replace(~r/(\d+) Hwy (\d+)/i, "\\1 Highway \\2")
-    |> safe_replace(~r/\bCR (\d+)/i, "County Road \\1")
-    |> safe_replace(~r/\bCO RD (\d+)/i, "County Road \\1")
+    # # |> safe_replace(~r/(?i)P O BOX/, "PO BOX")
+    # |> safe_replace(~r/\bUS (\d+)/i, "US Highway \\1")
+    # |> safe_replace(~r/\bUS Hwy (\d+)/i, "US Highway \\1")
+    # |> safe_replace(~r/(\d+) Hwy (\d+)/i, "\\1 Highway \\2")
+    # |> safe_replace(~r/\bCR (\d+)/i, "County Road \\1")
+    # |> safe_replace(~r/\bCO RD (\d+)/i, "County Road \\1")
+    # |> safe_replace(~r/\bST RD (\d+)/i, "State Road \\1")
+    # # TODO: In certain states, change this to State Route instead
+    # |> safe_replace(~r/SR (\d+)/i, "State Road \\1")
     |> safe_replace(~r/(.+)#/, "\\1 #")
     |> safe_replace(~r/\n/, ", ")
     |> safe_replace(~r/\t/, " ")
+    |> safe_replace(~r/\_/, " ")
+    |> safe_replace(~r/\/(\D)/, " \\1")
+    |> safe_replace(~r/(\D)\//, "\\1 ")
     |> safe_replace(~r/\"/, "")
     |> safe_replace(~r/\'/, "")
     |> safe_replace(~r/\s+/, " ")
@@ -1488,7 +1541,7 @@ defmodule AddressUS.Parser do
           "US"
 
         Regex.match?(~r/^(\d)/, word) && Enum.member?(word_endings, letters) ->
-          safe_upcase(word)
+          String.downcase(word)
 
         true ->
           String.split(word, "-")

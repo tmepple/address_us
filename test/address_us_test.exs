@@ -1707,4 +1707,28 @@ defmodule AddressUSTest do
 
     assert desired_result == parse_address_line("8356 N 600 W  W OF MAIN HANGER")
   end
+
+  test "101 W 61ST AVE STATE ROAD 51" do
+    desired_result = %Street{
+      additional_designation: "State Road 51",
+      name: "61st",
+      pre_direction: "W",
+      primary_number: "101",
+      suffix: "Ave"
+    }
+
+    assert desired_result == parse_address_line("101 W 61ST AVE STATE ROAD 51")
+  end
+
+  test "1 N BROADWAY MAILSTOP 70" do
+    desired_result = %Street{
+      name: "Broadway",
+      pre_direction: "N",
+      primary_number: "1",
+      secondary_designator: "Ms",
+      secondary_value: "70"
+    }
+
+    assert desired_result == parse_address_line("1 N BROADWAY MS 70")
+  end
 end

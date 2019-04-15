@@ -335,6 +335,7 @@ defmodule AddressUSConfig do
       "Lobby" => "Lbby",
       "Lot" => "Lot",
       "Lower" => "Lowr",
+      "Mailstop" => "Ms",
       "Office" => "Ofc",
       "Penthouse" => "Ph",
       "Pier" => "Pier",
@@ -919,6 +920,7 @@ defmodule AddressUSConfig do
     }
   end
 
+  # NOTE: This list should be kept in sync with common_suffix_keys
   def common_suffixes do
     %{
       "AV" => "Ave",
@@ -981,8 +983,78 @@ defmodule AddressUSConfig do
       "TURNPIKE" => "Tpke",
       "TURNPK" => "Tpke",
       "WAY" => "Way",
-      "WY" => "Way"
+      "WY" => "Way",
+      # NOTE: We are intentionally not changing "CROSSING" to XING to avoid false positives
+      "XING" => "Xing"
     }
+  end
+
+  # NOTE: This list should be kept in sync with common_suffixes
+  # Exists to speed up hot path
+  def common_suffix_keys do
+    [
+      "AV",
+      "AVE",
+      "AVEN",
+      "AVENU",
+      "AVENUE",
+      "AVN",
+      "AVNUE",
+      "BLVD",
+      "BOUL",
+      "BOULEVARD",
+      "BOULV",
+      "BYP",
+      "BYPA",
+      "BYPAS",
+      "BYPASS",
+      "BYPS",
+      "COURT",
+      "CRT",
+      "CT",
+      "DR",
+      "DRIV",
+      "DRIVE",
+      "DRV",
+      "EXP",
+      "EXPR",
+      "EXPRESS",
+      "EXPRESSWAY",
+      "EXPW",
+      "EXPY",
+      "HIGHWAY",
+      "HIGHWY",
+      "HIWAY",
+      "HIWY",
+      "HWAY",
+      "HWY",
+      "LA",
+      "LANE",
+      "LN",
+      "PARKWAY",
+      "PARKWY",
+      "PIKE",
+      "PKWAY",
+      "PKWY",
+      "PKY",
+      "RD",
+      "ROAD",
+      "ST",
+      "STR",
+      "STREET",
+      "STRT",
+      "TPK",
+      "TPKE",
+      "TR",
+      "TRAIL",
+      "TRL",
+      "TRNPK",
+      "TRPK",
+      "TURNPIKE",
+      "TURNPK",
+      "WAY",
+      "WY"
+    ]
   end
 
   def street_name_subs do
