@@ -1056,12 +1056,19 @@ defmodule AddressUS.Parser do
     |> safe_replace(~r/\bUS (\d+)/i, "US_Highway_\\1")
     |> safe_replace(~r/\bUS (Hwy|Highway) (\d+)/i, "US_Highway_\\2")
     # |> safe_replace(~r/\bUS Highway (\d+)/i, "US_Highway_\\1")
-    |> safe_replace(~r/(\d+) (Hwy|Highway) (\d+)/i, "\\1 Highway_\\2")
+    |> safe_replace(~r/\b(FM|FARM TO MARKET|FARM TO MKT|HWY FM) (\d+)/i, "FM_\\2")
     |> safe_replace(~r/\bCR (\d+)/i, "County_Road_\\1")
-    |> safe_replace(~r/\bCO (RD|ROAD) (\d+)/i, "County_Road_\\2")
+    |> safe_replace(~r/\b(CO|COUNTY|CNTY) (RD|ROAD) (\d+)/i, "County_Road_\\3")
+    |> safe_replace(~r/\b(CO|COUNTY|CNTY) (HWY|HIGHWAY) (\d+)/i, "County_Highway_\\3")
     |> safe_replace(~r/\bCH (\d+|[A-Z]+)/i, "County_Highway_\\1")
-    |> safe_replace(~r/\bSTATE (RD|ROAD) (\d+)/i, "State_Road_\\2")
-    |> safe_replace(~r/\bST (RD|ROAD) (\d+)/i, "State_Road_\\2")
+    |> safe_replace(~r/\b(TWP|TOWNSHIP) (RD|ROAD) (\d+)/i, "Township_Road_\\3")
+    |> safe_replace(~r/\b(TWP|TOWNSHIP) (HWY|HIGHWAY) (\d+)/i, "Township_Highway_\\3")
+    |> safe_replace(~r/\b(ST|STATE) (HWY|HIGHWAY) (\d+)/i, "State_Highway_\\3")
+    |> safe_replace(~r/\b(ST|STATE) (RD|ROAD) (\d+)/i, "State_Road_\\3")
+    |> safe_replace(~r/\b(ST|STATE) (RT|RTE) (\d+)/i, "State_Route_\\3")
+    |> safe_replace(~r/\b(RTE|ROUTE) (\d+)/i, "Route_\\2")
+    |> safe_replace(~r/(\d+) (Hwy|Highway) (\d+)/i, "\\1 Highway_\\2")
+
     # TODO: In certain states, change this to State Route instead
     |> safe_replace(~r/\bSR (\d+)/i, standardize_sr(state))
   end
