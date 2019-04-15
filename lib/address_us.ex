@@ -356,8 +356,8 @@ defmodule AddressUS.Parser do
           address
           |> Enum.join(" ")
           |> String.split("&")
-          |> tl
-          |> hd
+          |> tl()
+          |> hd()
           |> String.split(" ")
 
         get_number(new_address, backup, nil, box, p_val, p_des, false)
@@ -1397,6 +1397,7 @@ defmodule AddressUS.Parser do
     # |> safe_replace(~r/\s\.\s/, ". ")
     # |> safe_replace(~r/\s\.(\S)/, ". \\1")
     # |> safe_replace(~r/(\S)\.\s/, "\\1. ")
+    |> safe_replace(~r/(?i)P\.O\.BOX/, "PO BOX")
     # remove periods that are not adjacent to digits
     |> safe_replace(~r/(?!\d)\.(?!\d)/, "")
     |> safe_replace(~r/(?i)P O BOX/, "PO BOX")

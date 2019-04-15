@@ -1634,5 +1634,18 @@ defmodule AddressUSTest do
       pre_direction: "W",
       primary_number: "101"
     }
+
+    assert desired_result == parse_address_line("101 W North")
+  end
+
+  test "2709 PATTERSON ST. P.O.BOX 496" do
+    desired_result = %Street{
+      name: "Patterson",
+      suffix: "St",
+      additional_designation: "PO Box 496",
+      primary_number: "2709"
+    }
+
+    assert desired_result == parse_address_line("2709 PATTERSON ST. P.O.BOX 496")
   end
 end
