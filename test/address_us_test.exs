@@ -289,6 +289,8 @@ defmodule AddressUSTest do
     assert desired_result == result
   end
 
+  # NOTE: Deviating from upstream -- Basement is an additional designation in this case
+  # Corner cases made requiring a value with a secondary designator (unless it's of form #44)
   test "Parse an address with no secondary number" do
     desired_result = %Address{
       city: "Denver",
@@ -298,7 +300,7 @@ defmodule AddressUSTest do
         name: "Blah",
         primary_number: "2345",
         pre_direction: "SW",
-        secondary_designator: "Bsmt",
+        additional_designation: "Basement",
         suffix: "St"
       }
     }
@@ -1683,5 +1685,26 @@ defmodule AddressUSTest do
     }
 
     assert desired_result == parse_address_line("5875 CASTLE CREEK PKWY DR BLDG 4 STE 195")
+  end
+
+  test "9704 BEAUMONT RD MAINT BLDG" do
+    desired_result = %Street{
+      additional_designation: "Maint Bldg",
+      name: "Beaumont",
+      primary_number: "9704",
+      suffix: "Rd"
+    }
+
+    assert desired_result == parse_address_line("9704 BEAUMONT RD MAINT BLDG")
+  end
+
+  test "8356 N 600 W  W OF MAIN HANGER" do
+    desired_result = %Street{
+      name: "600 W W Of Main Hanger",
+      pre_direction: "N",
+      primary_number: "8356"
+    }
+
+    assert desired_result == parse_address_line("8356 N 600 W  W OF MAIN HANGER")
   end
 end

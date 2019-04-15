@@ -653,12 +653,17 @@ defmodule AddressUS.Parser do
             Logger.debug("at 6")
             get_secondary(backup, backup, nil, nil, nil, addit, true)
 
+          value ->
+            Logger.debug("at 6a")
+            get_secondary(tail, backup, pmb, Map.get(units, title_case(head)), value, addit, true)
+
+          # For the secondary parsing to work when a valid Unit is provided we need to have a value
           true ->
             Logger.debug("at 7")
-            get_secondary(tail, backup, pmb, Map.get(units, title_case(head)), value, addit, true)
+            get_secondary(backup, backup, nil, nil, nil, addit, true)
         end
 
-      Map.values(units) |> Enum.member?(title_case(head)) ->
+      value && Map.values(units) |> Enum.member?(title_case(head)) ->
         Logger.debug("at 8")
         get_secondary(tail, backup, pmb, title_case(head), value, addit, true)
 
@@ -1448,7 +1453,7 @@ defmodule AddressUS.Parser do
     |> safe_replace(~r/\n/, ", ")
     |> safe_replace(~r/\t/, " ")
     |> safe_replace(~r/\"/, "")
-    |> safe_replace(~r/\'/, " ")
+    |> safe_replace(~r/\'/, "")
     |> safe_replace(~r/\s+/, " ")
     |> safe_replace(~r/,(\S)/, ", \\1")
     |> safe_replace(~r/\s,(\S)/, ", \\1")
