@@ -1,11 +1,7 @@
 defmodule AddressUSTest do
   use ExUnit.Case
 
-  import AddressUS.Parser,
-    only: [
-      parse_address: 1,
-      parse_address_line: 1
-    ]
+  import AddressUS.Parser
 
   test "Parse 5 digit postal code" do
     desired_result = %Address{postal: "80219"}
@@ -1732,4 +1728,29 @@ defmodule AddressUSTest do
 
     assert desired_result == parse_address_line("1 N BROADWAY MS 70")
   end
+
+  test "400 E MAIN ST RT #40, Cambridge City, IN" do
+    desired_result = %Address{
+      city: "Cambridge City",
+      state: "IN",
+      street: %Street{
+        additional_designation: "Route 40",
+        name: "Main",
+        pre_direction: "E",
+        primary_number: "400",
+        suffix: "St"
+      }
+    }
+
+    assert desired_result == parse_address("400 E MAIN ST RT #40, Cambridge City, IN")
+    assert clean_address_line("400 E MAIN ST RT #40") == "400 E MAIN ST\nROUTE 40"
+  end
+
+  # With the embedded slash since this could be a intersection it's only standardized not parsed.
+  test "127 WEST JASPER ST/US HWY 24 W" do
+    assert clean_address_line("127 WEST JASPER ST/US HWY 24 W") ==
+             "127 WEST JASPER ST/US HIGHWAY 24 W"
+  end
+
+  # TODO: Add tests for clean_address_line and all the new highway handling
 end

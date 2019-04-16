@@ -99,6 +99,43 @@ defmodule AddressUS.Parser do
     |> title_case()
   end
 
+  @doc """
+  Given a messy address line, returns it standardized and cleaned.  If there is no valid street number
+  or if an intersection is given it will only standardize the address, otherwise it will first parse
+  the address to standardize directionals, suffixes, and separate additional information.
+  """
+  def clean_address_line(messy_address, state \\ "", opts \\ [])
+
+  def clean_address_line(messy_address, _state, _opts) when not is_binary(messy_address), do: ""
+
+  def clean_address_line(messy_address, state, opts) do
+    {upcase?, opts} = Keyword.pop(opts, :upcase, true)
+
+    # NOTE: Check for WI explicitly to avoid every address in the country to face expensive regex
+    # TODO: Benchmark
+    valid_number? =
+      if state == "WI" do
+        Regex.match?(~r/^(\d+|[NEWS]\d+[NEWS]\d+\s|[NEWS]\d+\s)/, messy_address)
+      else
+        Regex.match?(~r/^\d+/, messy_address)
+      end
+
+    ret_val =
+      if not valid_number? do
+        standardize_address_line(messy_address, state)
+      else
+        possible_intersection? =
+          Regex.match?(~r/(\&|\sAND\s|\sAT\s|\@|\D\/|\/\D)/i, messy_address)
+
+        if possible_intersection?,
+          do: standardize_address_line(messy_address, state),
+          else: parse_address_line_fmt(messy_address, state, opts)
+      end
+
+    if upcase?, do: String.upcase(ret_val), else: ret_val
+  end
+
+  # CONSIDER: make this private and remove upper case opt since it's always called from clean_address_line anyway
   def parse_address_line_fmt(messy_address, _state) when not is_binary(messy_address), do: nil
 
   def parse_address_line_fmt(messy_address, state \\ "", opts \\ []) do
@@ -718,6 +755,11 @@ defmodule AddressUS.Parser do
         all_unit_values = Map.keys(units) ++ Map.values(units)
 
         cond do
+          # TODO: Other highway selectors belong here - but with risk of false positives
+          # plan to add as real cases appear
+          Enum.member?(["Rt"], title_case(tail_head)) ->
+            get_secondary(backup, backup, pmb, designator, nil, addit, true)
+
           Enum.member?(all_unit_values, title_case(tail_head)) ->
             secondary_unit =
               cond do
@@ -1084,6 +1126,8 @@ defmodule AddressUS.Parser do
   def standardize_highways(street_name, state) do
     street_name
     |> safe_replace(~r/\#/, "")
+    |> safe_replace(~r/\bI(-| )(\d+)/i, "Interstate_\\2")
+    |> safe_replace(~r/\bI(\d+)/i, "Interstate_\\1")
     |> safe_replace(~r/\bUS(-| )(\d+)/i, "US_Highway_\\2")
     |> safe_replace(~r/\bUS (Hwy|Highway) (\d+)/i, "US_Highway_\\2")
     # |> safe_replace(~r/\bUS Highway (\d+)/i, "US_Highway_\\1")
@@ -1097,8 +1141,11 @@ defmodule AddressUS.Parser do
     |> safe_replace(~r/\b(ST|STATE) (HWY|HIGHWAY) (\d+)/i, "State_Highway_\\3")
     |> safe_replace(~r/\bSTH (\d+)/i, "State_Highway_\\1")
     |> safe_replace(~r/\bSH (\d+)/i, "State_Highway_\\1")
-    |> safe_replace(~r/\b(ST|STATE) (RD|ROAD) (\d+)/i, "State_Road_\\3")
-    |> safe_replace(~r/\b(ST|STATE) (RT|RTE) (\d+)/i, "State_Route_\\3")
+    # The prefix to ST|STATE avoids false positives like "MAIN ST RT 40"
+    |> safe_replace(~r/\bSTATE (RD|ROAD) (\d+)/i, "State_Road_\\2")
+    |> safe_replace(~r/\bSTATE (RT|RTE) (\d+)/i, "State_Route_\\2")
+    |> safe_replace(~r/(^|\&\s)ST (RD|ROAD) (\d+)/i, "\\1State_Road_\\3")
+    |> safe_replace(~r/(^|\&\s)ST (RT|RTE) (\d+)/i, "\\1State_Route_\\3")
     |> safe_replace(~r/\b(RT|RTE|ROUTE) (\d+)/i, "Route_\\2")
     |> safe_replace(~r/(\d+) (Hwy|Highway) (\d+)/i, "\\1 Highway_\\2")
     |> safe_replace(~r/(\d+) (N|E|S|W) (Hwy|Highway) (\d+)/i, "\\1 \\2 Highway_\\3")
@@ -1275,6 +1322,8 @@ defmodule AddressUS.Parser do
     # and 9704 BEAUMONT RD MAINT BLDG
     {final_name, additional, suffix} =
       strip_additional_and_suffix_from_name(final_name, additional, suffix)
+
+    # final_name = standardize_highways(final_name, state)
 
     suffix = if suffix == "*", do: nil, else: suffix
 
@@ -1516,7 +1565,9 @@ defmodule AddressUS.Parser do
     |> safe_replace(~r/\)(.+)/, ") \\1")
     # NOTE: Don't remove parenthesis yet
     # |> safe_replace(~r/\((.+)\)/, "\\1")
-    |> safe_replace(~r/\sAND\s/i, "&")
+    |> safe_replace(~r/\sAND\s/i, " & ")
+    |> safe_replace(~r/\sAT\s/i, " & ")
+    |> safe_replace(~r/\@/i, " & ")
     |> safe_replace(~r/\sI.E.\s/i, "")
     |> safe_replace(~r/\sET\sAL\s/i, "")
     |> safe_replace(~r/\sIN\sCARE\sOF\s/i, "")
@@ -1543,8 +1594,10 @@ defmodule AddressUS.Parser do
     |> safe_replace(~r/\n/, ", ")
     |> safe_replace(~r/\t/, " ")
     |> safe_replace(~r/\_/, " ")
-    |> safe_replace(~r/\/(\D)/, " \\1")
-    |> safe_replace(~r/(\D)\//, "\\1 ")
+    # Slashes could mean intersection or adding an additional designation to existing street name
+    # Since it's ambiguous we need to retain them
+    # |> safe_replace(~r/\/(\D)/, " \\1")
+    # |> safe_replace(~r/(\D)\//, "\\1 ")
     |> safe_replace(~r/\"/, "")
     |> safe_replace(~r/\'/, "")
     |> safe_replace(~r/\s+/, " ")
