@@ -74,13 +74,13 @@ defmodule AddressUS.Parser do
   """
   def parse_address_line(invalid) when not is_binary(invalid), do: nil
 
-  def parse_address_line(messy_address) do
+  def parse_address_line(messy_address, state \\ "") do
     messy_address
     |> standardize_address
     |> log_term("std addr")
     |> String.split(" ")
     |> Enum.reverse()
-    |> parse_address_list("")
+    |> parse_address_list(state)
   end
 
   @doc """
@@ -97,6 +97,36 @@ defmodule AddressUS.Parser do
     |> standardize_highways(state)
     |> safe_replace("_", " ")
     |> title_case()
+  end
+
+  def parse_address_line_fmt(messy_address, _state) when not is_binary(messy_address), do: nil
+
+  def parse_address_line_fmt(messy_address, state \\ "", opts \\ []) do
+    upcase? = Keyword.get(opts, :upcase, true)
+    fmt_opt = Keyword.get(opts, :additional, :newline)
+
+    addr = parse_address_line(messy_address, state)
+
+    prim_line =
+      [addr.primary_number, addr.pre_direction, addr.name, addr.suffix, addr.post_direction]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.join(" ")
+      |> String.trim()
+
+    sec_line =
+      [addr.pmb, addr.secondary_designator, addr.secondary_value, addr.additional_designation]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.join(" ")
+      |> String.trim()
+
+    ret =
+      case {fmt_opt, sec_line} do
+        {_ad, sl} when sl == "" -> prim_line
+        {:newline, _sl} -> prim_line <> "\n" <> sec_line
+        {_parens, _sl} -> prim_line <> " (" <> sec_line <> ")"
+      end
+
+    if upcase?, do: String.upcase(ret), else: ret
   end
 
   @doc """
@@ -454,6 +484,7 @@ defmodule AddressUS.Parser do
         _ -> {hd(tail), tl(tail)}
       end
 
+    ## NOTE: This may parse addresses like "County Hwy 3N" wrong.
     detect_attached_post_direction = Regex.run(~r/^\d+([a-zA-Z])$/, head)
 
     attached_post_direction =
@@ -1053,29 +1084,31 @@ defmodule AddressUS.Parser do
   def standardize_highways(street_name, state) do
     street_name
     |> safe_replace(~r/\#/, "")
-    |> safe_replace(~r/\bUS (\d+)/i, "US_Highway_\\1")
+    |> safe_replace(~r/\bUS(-| )(\d+)/i, "US_Highway_\\2")
     |> safe_replace(~r/\bUS (Hwy|Highway) (\d+)/i, "US_Highway_\\2")
     # |> safe_replace(~r/\bUS Highway (\d+)/i, "US_Highway_\\1")
     |> safe_replace(~r/\b(FM|FARM TO MARKET|FARM TO MKT|HWY FM) (\d+)/i, "FM_\\2")
-    |> safe_replace(~r/\bCR (\d+)/i, "County_Road_\\1")
-    |> safe_replace(~r/\b(CO|COUNTY|CNTY) (RD|ROAD) (\d+)/i, "County_Road_\\3")
-    |> safe_replace(~r/\b(CO|COUNTY|CNTY) (HWY|HIGHWAY) (\d+)/i, "County_Highway_\\3")
+    |> safe_replace(~r/\bCR ([\dA-Z]+)/i, "County_Road_\\1")
+    |> safe_replace(~r/\b(CO|COUNTY|CNTY) (RD|ROAD) ([\dA-Z]+)/i, "County_Road_\\3")
+    |> safe_replace(~r/\b(CO|COUNTY|CNTY) (HWY|HIGHWAY) ([\dA-Z]+)/i, "County_Highway_\\3")
     |> safe_replace(~r/\bCH (\d+|[A-Z]+)/i, "County_Highway_\\1")
     |> safe_replace(~r/\b(TWP|TOWNSHIP) (RD|ROAD) (\d+)/i, "Township_Road_\\3")
     |> safe_replace(~r/\b(TWP|TOWNSHIP) (HWY|HIGHWAY) (\d+)/i, "Township_Highway_\\3")
     |> safe_replace(~r/\b(ST|STATE) (HWY|HIGHWAY) (\d+)/i, "State_Highway_\\3")
+    |> safe_replace(~r/\bSTH (\d+)/i, "State_Highway_\\1")
+    |> safe_replace(~r/\bSH (\d+)/i, "State_Highway_\\1")
     |> safe_replace(~r/\b(ST|STATE) (RD|ROAD) (\d+)/i, "State_Road_\\3")
     |> safe_replace(~r/\b(ST|STATE) (RT|RTE) (\d+)/i, "State_Route_\\3")
-    |> safe_replace(~r/\b(RTE|ROUTE) (\d+)/i, "Route_\\2")
+    |> safe_replace(~r/\b(RT|RTE|ROUTE) (\d+)/i, "Route_\\2")
     |> safe_replace(~r/(\d+) (Hwy|Highway) (\d+)/i, "\\1 Highway_\\2")
-
-    # TODO: In certain states, change this to State Route instead
+    |> safe_replace(~r/(\d+) (N|E|S|W) (Hwy|Highway) (\d+)/i, "\\1 \\2 Highway_\\3")
     |> safe_replace(~r/\bSR (\d+)/i, standardize_sr(state))
+    |> safe_replace(~r/\bSR(\d+)/i, standardize_sr(state))
   end
 
-  defp standardize_sr(state) when state in ["CA", "TN"], do: "State_Route_\\1"
+  defp standardize_sr(state) when state in ["FL", "IN", "NM"], do: "State_Road_\\1"
 
-  defp standardize_sr(_state), do: "State_Road_\\1"
+  defp standardize_sr(_state), do: "State_Route_\\1"
 
   def get_valid_suffix_index(street_list) do
     Enum.with_index(street_list)

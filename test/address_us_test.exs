@@ -795,7 +795,7 @@ defmodule AddressUSTest do
     assert desired_result == result
   end
 
-  # Test standardizing FM roads per USPS Pub 28
+  # Change: Test standardizing FM roads per USPS Pub 28
   test "Parse address: 2230 Farm to Market 407, Highland Village, TX 75077" do
     desired_result = %Address{
       city: "Highland Village",
