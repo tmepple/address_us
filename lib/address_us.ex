@@ -843,25 +843,21 @@ defmodule AddressUS.Parser do
           is_possible_suite_number?(head) &&
               (String.length(tail_tail) < 2 ||
                  String.upcase(hd(tail_tail)) == "STATE") ->
-            log_term("at 15")
-            IO.inspect(backup, label: "at 15")
+            log_term(backup, "at 15")
             get_secondary(backup, backup, pmb, designator, value, addit, true)
 
           Map.values(directions) |> Enum.member?(safe_upcase(head)) ||
               safe_has_key?(directions, title_case(head)) ->
-            log_term("at 16")
-            IO.inspect(backup, label: "at 16")
+            log_term(backup, "at 16")
             get_secondary(backup, backup, pmb, designator, value, addit, true)
 
           # Handle "1400 W Avenue B"
           get_suffix_value(tail_head) == "Ave" && String.length(head) == 1 ->
-            log_term("at 16a")
-            IO.inspect(backup, label: "at 16a")
+            log_term(backup, "at 16a")
             get_secondary(backup, backup, pmb, designator, value, addit, true)
 
           true ->
-            log_term("at 17")
-            IO.inspect(backup, label: "at 17")
+            log_term(backup, "at 17")
 
             # get_secondary(backup, backup, pmb, designator, value, addit, true)
             get_secondary(
@@ -1279,11 +1275,11 @@ defmodule AddressUS.Parser do
       case {street_name, box, pre_direction, suffix, p_val, p_des, post_direction} do
         # TODO: Check on what addresses would make this occur
         {nil, b, _, _, _, _, _} when b != nil ->
-          IO.inspect({box, pre_direction, suffix, p_val, post_direction}, label: "first case")
+          log_term({box, pre_direction, suffix, p_val, post_direction}, "first case")
 
         # TODO: Check on what addresses would make this occur
         {nil, _, _, _, pv, nil, _} when pv != nil ->
-          IO.inspect({pv, pre_direction, suffix, nil, post_direction}, label: "second case")
+          log_term({pv, pre_direction, suffix, nil, post_direction}, "second case")
 
         # If the Suffix is St or Dr (which would never be valid street names) leave it at suffix
         {nil, _, pre, suf, _, _, _} when pre != nil and suf in ["St", "Dr"] ->
