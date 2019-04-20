@@ -701,12 +701,12 @@ defmodule AddressUS.Parser do
         cond do
           # NOTE: Unsure what this code does as all existing tests run without it and it caused Box parsing issues
           # contains_po_box?(tail) || is_state?(tail_head) ->
-          #   Logger.debug("at 1")
+          #   log_term("at 1")
           #   IO.inspect(backup, label: "at 1")
           #   get_secondary(tail, backup, pmb, designator, value, addit, false)
 
           tail_head == '&' ->
-            Logger.debug("at 2")
+            log_term("at 2")
 
             get_secondary(
               tail_tail,
@@ -719,36 +719,36 @@ defmodule AddressUS.Parser do
             )
 
           safe_starts_with?(value, "&") ->
-            Logger.debug("at 3")
+            log_term("at 3")
             get_secondary(tail, backup, pmb, designator, head, addit, false)
 
           tail_head == "#" ->
-            Logger.debug("at 4")
+            log_term("at 4")
             get_secondary(tail_tail, backup, pmb, designator, head, addit, false)
 
           true ->
-            Logger.debug("at 5")
+            log_term("at 5")
             get_secondary(tail, backup, pmb, designator, head, addit, false)
         end
 
       safe_has_key?(units, title_case(head)) ->
         cond do
           safe_has_key?(suffixes, safe_upcase(value)) ->
-            Logger.debug("at 6")
+            log_term("at 6")
             get_secondary(backup, backup, nil, nil, nil, addit, true)
 
           value ->
-            Logger.debug("at 6a")
+            log_term("at 6a")
             get_secondary(tail, backup, pmb, Map.get(units, title_case(head)), value, addit, true)
 
           # For the secondary parsing to work when a valid Unit is provided we need to have a value
           true ->
-            Logger.debug("at 7")
+            log_term("at 7")
             get_secondary(backup, backup, nil, nil, nil, addit, true)
         end
 
       value && Map.values(units) |> Enum.member?(title_case(head)) ->
-        Logger.debug("at 8")
+        log_term("at 8")
         get_secondary(tail, backup, pmb, title_case(head), value, addit, true)
 
       safe_starts_with?(head, "#") && !contains_po_box?(address) ->
@@ -770,7 +770,7 @@ defmodule AddressUS.Parser do
                   Map.get(units, title_case(tail_head))
               end
 
-            Logger.debug("at 9")
+            log_term("at 9")
 
             get_secondary(
               tail_tail,
@@ -783,7 +783,7 @@ defmodule AddressUS.Parser do
             )
 
           true ->
-            Logger.debug("at 10")
+            log_term("at 10")
 
             get_secondary(
               tail,
@@ -810,7 +810,7 @@ defmodule AddressUS.Parser do
                   Map.get(units, title_case(tail_head))
               end
 
-            Logger.debug("at 11")
+            log_term("at 11")
             get_secondary(tail_tail, backup, pmb, secondary_unit, head <> value, addit, true)
 
           Enum.member?(all_unit_values, title_case(head)) ->
@@ -823,18 +823,18 @@ defmodule AddressUS.Parser do
                   Map.get(units, title_case(head))
               end
 
-            Logger.debug("at 12")
+            log_term("at 12")
             get_secondary(tail, backup, pmb, secondary_unit, value, addit, true)
 
           true ->
-            Logger.debug("at 13")
+            log_term("at 13")
             get_secondary(backup, backup, pmb, designator, nil, addit, true)
         end
 
       is_possible_suite_number?(tail_head) &&
           (safe_has_key?(units, title_case(tail_head)) ||
              Map.values(units) |> Enum.member?(title_case(tail_head))) ->
-        Logger.debug("at 14")
+        log_term("at 14")
 
         get_secondary(tail, backup, pmb, designator, safe_replace(head, ",", ""), addit, false)
 
@@ -843,24 +843,24 @@ defmodule AddressUS.Parser do
           is_possible_suite_number?(head) &&
               (String.length(tail_tail) < 2 ||
                  String.upcase(hd(tail_tail)) == "STATE") ->
-            Logger.debug("at 15")
+            log_term("at 15")
             IO.inspect(backup, label: "at 15")
             get_secondary(backup, backup, pmb, designator, value, addit, true)
 
           Map.values(directions) |> Enum.member?(safe_upcase(head)) ||
               safe_has_key?(directions, title_case(head)) ->
-            Logger.debug("at 16")
+            log_term("at 16")
             IO.inspect(backup, label: "at 16")
             get_secondary(backup, backup, pmb, designator, value, addit, true)
 
           # Handle "1400 W Avenue B"
           get_suffix_value(tail_head) == "Ave" && String.length(head) == 1 ->
-            Logger.debug("at 16a")
+            log_term("at 16a")
             IO.inspect(backup, label: "at 16a")
             get_secondary(backup, backup, pmb, designator, value, addit, true)
 
           true ->
-            Logger.debug("at 17")
+            log_term("at 17")
             IO.inspect(backup, label: "at 17")
 
             # get_secondary(backup, backup, pmb, designator, value, addit, true)
@@ -876,11 +876,11 @@ defmodule AddressUS.Parser do
         end
 
       tail_head == "&" ->
-        Logger.debug("at 18")
+        log_term("at 18")
         get_secondary(tail_tail, backup, pmb, designator, value, addit, false)
 
       true ->
-        Logger.debug("at 19")
+        log_term("at 19")
         get_secondary(backup, backup, pmb, designator, value, addit, true)
     end
   end
@@ -1771,7 +1771,7 @@ defmodule AddressUS.Parser do
     end
   end
 
-  defp log_term(term, label) do
+  defp log_term(term \\ nil, label) do
     # Logger.debug(label <> ": " <> inspect(term))
     term
   end
