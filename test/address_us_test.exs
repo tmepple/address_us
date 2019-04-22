@@ -1749,7 +1749,12 @@ defmodule AddressUSTest do
   # With the embedded slash since this could be a intersection it's only standardized not parsed.
   test "127 WEST JASPER ST/US HWY 24 W" do
     assert clean_address_line("127 WEST JASPER ST/US HWY 24 W") ==
-             "127 WEST JASPER ST/US HIGHWAY 24 W"
+             "127 W JASPER ST/US HIGHWAY 24 W"
+  end
+
+  test "2128 MOUNDS ROAD & STATE ROAD 109" do
+    assert clean_address_line("2128 MOUNDS ROAD & SR 109", "IN") ==
+             "2128 MOUNDS RD & STATE ROAD 109"
   end
 
   # TODO: Add tests for clean_address_line and all the new highway handling

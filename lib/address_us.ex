@@ -130,23 +130,34 @@ defmodule AddressUS.Parser do
       if not valid_number? do
         standardize_address_line(messy_address, state)
       else
-        # standardize only the intersection & AND AT @ right now (don't worry about the slash)
-
-        # split on &
+        # standardize only the intersection & AND AT @ and split
+        split_address =
+          Standardizer.standardize_intersections(messy_address) |> String.split(" & ", parts: 2)
 
         # if no & then just parse
+        if length(split_address) == 1 do
+          parse_address_line_fmt(messy_address, state, opts)
+        else
+          # if there's a slash in the first item that's not a fraction then just standardize
+          if Regex.match?(~r/(\D\/|\/\D)/i, List.first(split_address)) do
+            standardize_address_line(messy_address, state)
+          else
+            # run first portion through parse_address_line_fmt and second portion through standardize then recombine with " & "
+            split_line =
+              parse_address_line_fmt(List.first(split_address), state, opts)
+              |> String.split("\n", parts: 2)
 
-        # if there's a & with no slash (that's not a fraction) in the first portion then run first portion through parse_address_line_fmt and second portion through standardize then recombine with " & "
-
-        # if there's a slash that's not a fraction then just standardize and be done with it.
-        possible_intersection? =
-          Regex.match?(~r/(\&|\sAND\s|\sAT\s|\@|\D\/|\/\D)/i, messy_address)
-
-        if possible_intersection?,
-          # TODO: possible_intersection should break on the above regex and run the first string through parse_address_line_fmt
-          # and the second through standardize_address then tie both sides back again with a " & "
-          do: standardize_address_line(messy_address, state),
-          else: parse_address_line_fmt(messy_address, state, opts)
+            if length(split_line) == 1 do
+              List.first(split_line) <>
+                " & " <> standardize_address_line(List.last(split_address), state)
+            else
+              List.first(split_line) <>
+                " & " <>
+                standardize_address_line(List.last(split_address), state) <>
+                "\n" <> List.last(split_line)
+            end
+          end
+        end
       end
 
     if upcase?, do: String.upcase(ret_val), else: ret_val
