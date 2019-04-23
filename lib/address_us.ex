@@ -138,7 +138,8 @@ defmodule AddressUS.Parser do
         if length(split_address) == 1 do
           parse_address_line_fmt(messy_address, state, opts)
         else
-          # if there's a slash in the first item that's not a fraction then just standardize
+          # if there's a slash in the first item that's not a fraction then just standardize as there's too much ambiguity
+          # on what the slash means
           if Regex.match?(~r/(\D\/|\/\D)/i, List.first(split_address)) do
             standardize_address_line(messy_address, state)
           else
