@@ -5,10 +5,10 @@ defmodule AddressUS.Parser.Standardizer do
   # deletes the periods per the best practices outlined by the USPS.  It also
   # replaces newline characters with commas, and replaces '# <value>' with
   # '#<value>' and then returns the string.
-  def standardize_address(address) when not is_binary(address), do: nil
+  def standardize_address(messy_address) when not is_binary(messy_address), do: nil
 
-  def standardize_address(address) do
-    address
+  def standardize_address(messy_address) do
+    messy_address
     # |> safe_replace(~r/ United States$/, "")
     |> safe_replace(~r/ UNITED STATES$/i, "")
     |> safe_replace(~r/ US$/, "")
@@ -66,14 +66,21 @@ defmodule AddressUS.Parser.Standardizer do
     # |> safe_replace(~r/\s\.\s/, ". ")
     # |> safe_replace(~r/\s\.(\S)/, ". \\1")
     # |> safe_replace(~r/(\S)\.\s/, "\\1. ")
-    |> safe_replace(~r/(?i)P\.O\.BOX/, "PO BOX")
+    |> safe_replace(~r/P O BOX/i, "PO BOX")
+    |> safe_replace(~r/P\.O\.BOX/i, "PO BOX")
+    |> safe_replace(~r/PO BOX(\d+)/i, "PO BOX \\1")
     # remove periods that are not adjacent to digits
     |> safe_replace(~r/(?!\d)\.(?!\d)/, "")
-    |> safe_replace(~r/(?i)P O BOX/, "PO BOX")
-    |> safe_replace(~r/PO BOX(\d+)/, "PO BOX \\1")
     |> safe_replace(~r/\s,\s/, ", ")
     |> String.trim()
   end
+
+  # def standardize_po_boxes(messy_address) do
+  #   messy_address
+  #   |> safe_replace(~r/P\.O\.BOX/i, "PO BOX")
+  #   |> safe_replace(~r/P O BOX/i, "PO BOX")
+  #   |> safe_replace(~r/PO BOX(\d+)/i, "PO BOX \\1")
+  # end
 
   def standardize_highways(street_name, state) do
     street_name
@@ -110,6 +117,11 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\sAND\s/i, " & ")
     |> safe_replace(~r/\sAT\s/i, " & ")
     |> safe_replace(~r/\@/i, " & ")
+  end
+
+  def postpend_prepended_po_box(messy_address) do
+    messy_address
+    |> safe_replace(~r/^((P O BOX|PO BOX)\s*(\d+))[\s\-\/]+(.+)/i, "\\4 \\1")
   end
 
   ############################################################################

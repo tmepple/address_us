@@ -1757,5 +1757,10 @@ defmodule AddressUSTest do
              "2128 MOUNDS RD & STATE ROAD 109"
   end
 
-  # TODO: Add tests for clean_address_line and all the new highway handling
+  # Prepended PO Box handling
+  test "PO Box 423 - 18 West Main Street" do
+    assert clean_address_line("PO Box 423 -  18 West Main Street") == "18 W MAIN ST\nPO BOX 423"
+  end
+
+  # TODO: Add tests for all the new highway handling
 end

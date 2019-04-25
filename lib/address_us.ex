@@ -117,6 +117,8 @@ defmodule AddressUS.Parser do
   def clean_address_line(messy_address, state, opts) do
     {upcase?, opts} = Keyword.pop(opts, :upcase, true)
 
+    messy_address = Standardizer.postpend_prepended_po_box(messy_address)
+
     # NOTE: Check for WI explicitly to avoid every address in the country to face expensive regex
     # TODO: Benchmark
     valid_number? =
