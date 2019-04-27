@@ -126,12 +126,19 @@ defmodule AddressUS.Parser.Helpers do
   def title_case(value) do
     word_endings = ["ST", "ND", "RD", "TH"]
 
+    cap_unless_us = fn word ->
+      if String.downcase(word) == "us", do: "US", else: String.capitalize(word)
+    end
+
     make_title_case = fn word ->
       letters = safe_replace(word, ~r/\d+/, "")
 
       cond do
         String.downcase(word) == "us" ->
           "US"
+
+        String.contains?(word, "_") ->
+          String.split(word, "_") |> Enum.map(&cap_unless_us.(&1)) |> Enum.join("_")
 
         Regex.match?(~r/^(\d)/, word) && Enum.member?(word_endings, letters) ->
           String.downcase(word)
@@ -218,7 +225,7 @@ defmodule AddressUS.Parser.Helpers do
   end
 
   def log_term(term \\ nil, label) do
-    # Logger.debug(label <> ": " <> inspect(term))
+    Logger.debug(label <> ": " <> inspect(term))
     term
   end
 

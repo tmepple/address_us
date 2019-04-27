@@ -88,7 +88,10 @@ defmodule AddressUS.Parser.AddrLine do
 
     log_term({final_name, final_secondary_val}, "final_name, secondary_val")
 
-    final_name = Standardizer.standardize_highways(final_name, state)
+    # TODO: Should we do this here or at the beginning of the process in address_us.ex
+    final_name = Standardizer.standardize_highways(final_name, state, :street_addr)
+
+    log_term(final_name, "after standardizing highways")
 
     # In case the suffix wasn't parsed out due to extraneous designations still present in the street name
     # 5875 CASTLE CREEK PKWY DR BLDG 4 STE 195 is a good test -- Bldg 4 should be removed to additional
@@ -96,6 +99,7 @@ defmodule AddressUS.Parser.AddrLine do
     # and 9704 BEAUMONT RD MAINT BLDG
     {final_name, additional, suffix} =
       strip_additional_and_suffix_from_name(final_name, additional, suffix)
+      |> log_term("final_name, addtl, suffix after stripping")
 
     # final_name = standardize_highways(final_name, state)
 

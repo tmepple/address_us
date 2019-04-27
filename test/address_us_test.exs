@@ -1125,12 +1125,13 @@ defmodule AddressUSTest do
     assert desired_result == result
   end
 
+  # According to USPS Pub 28 "HWY" is standardized as "Highway"
   test "394 S. HWY 29, Cantonment, FL 32803" do
     desired_result = %Address{
       city: "Cantonment",
       state: "FL",
       postal: "32803",
-      street: %Street{name: "Hwy 29", primary_number: "394", pre_direction: "S"}
+      street: %Street{name: "Highway 29", primary_number: "394", pre_direction: "S"}
     }
 
     result = parse_address("394 S. HWY 29, Cantonment, FL 32803")
@@ -1760,6 +1761,20 @@ defmodule AddressUSTest do
   # Prepended PO Box handling
   test "PO Box 423 - 18 West Main Street" do
     assert clean_address_line("PO Box 423 -  18 West Main Street") == "18 W MAIN ST\nPO BOX 423"
+  end
+
+  test "1400 OLD HWY. 69 S., Cambridge City, IN" do
+    desired_result = %Address{
+      city: "Cambridge City",
+      state: "IN",
+      street: %Street{
+        name: "Old Highway 69",
+        primary_number: "1400",
+        post_direction: "S"
+      }
+    }
+
+    assert desired_result == parse_address("1400 OLD HWY. 69 S., Cambridge City, IN")
   end
 
   # TODO: Add tests for all the new highway handling

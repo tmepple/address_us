@@ -82,34 +82,55 @@ defmodule AddressUS.Parser.Standardizer do
   #   |> safe_replace(~r/PO BOX(\d+)/i, "PO BOX \\1")
   # end
 
-  def standardize_highways(street_name, state) do
-    street_name
-    |> safe_replace(~r/\#/, "")
+  @doc "Given the parsed street address or full address line will standardize highways into USPS standard abbreviations"
+  def standardize_highways(street_addr_or_line, state, input \\ :line) do
+    street_addr_or_line
+    # |> safe_replace(~r/\#/, "")
     |> safe_replace(~r/\bI(-| )(\d+)/i, "Interstate_\\2")
     |> safe_replace(~r/\bI(\d+)/i, "Interstate_\\1")
-    |> safe_replace(~r/\bUS(-| )(\d+)/i, "US_Highway_\\2")
-    |> safe_replace(~r/\bUS (Hwy|Highway) (\d+)/i, "US_Highway_\\2")
+    |> safe_replace(~r/\bUS(-| )\#?(\d+)/i, "US_Highway_\\2")
+    |> safe_replace(~r/\bUS (Hwy|Highway) \#?(\d+)/i, "US_Highway_\\2")
     # |> safe_replace(~r/\bUS Highway (\d+)/i, "US_Highway_\\1")
-    |> safe_replace(~r/\b(FM|FARM TO MARKET|FARM TO MKT|HWY FM) (\d+)/i, "FM_\\2")
-    |> safe_replace(~r/\bCR ([\dA-Z]+)/i, "County_Road_\\1")
-    |> safe_replace(~r/\b(CO|COUNTY|CNTY) (RD|ROAD) ([\dA-Z]+)/i, "County_Road_\\3")
-    |> safe_replace(~r/\b(CO|COUNTY|CNTY) (HWY|HIGHWAY) ([\dA-Z]+)/i, "County_Highway_\\3")
-    |> safe_replace(~r/\bCH (\d+|[A-Z]+)/i, "County_Highway_\\1")
-    |> safe_replace(~r/\b(TWP|TOWNSHIP) (RD|ROAD) (\d+)/i, "Township_Road_\\3")
-    |> safe_replace(~r/\b(TWP|TOWNSHIP) (HWY|HIGHWAY) (\d+)/i, "Township_Highway_\\3")
-    |> safe_replace(~r/\b(ST|STATE) (HWY|HIGHWAY) (\d+)/i, "State_Highway_\\3")
-    |> safe_replace(~r/\bSTH (\d+)/i, "State_Highway_\\1")
-    |> safe_replace(~r/\bSH (\d+)/i, "State_Highway_\\1")
+    |> safe_replace(~r/\b(FM|FARM TO MARKET|FARM TO MKT|HWY FM) \#?(\d+)/i, "FM_\\2")
+    |> safe_replace(~r/\bCR \#?([\dA-Z]+)/i, "County_Road_\\1")
+    |> safe_replace(~r/\b(CO|COUNTY|CNTY) (RD|ROAD) \#?([\dA-Z]+)/i, "County_Road_\\3")
+    |> safe_replace(~r/\b(CO|COUNTY|CNTY) (HWY|HIGHWAY) \#?([\dA-Z]+)/i, "County_Highway_\\3")
+    |> safe_replace(~r/\bCH \#?(\d+|[A-Z]+)/i, "County_Highway_\\1")
+    |> safe_replace(~r/\b(TWP|TOWNSHIP) (RD|ROAD) \#?(\d+)/i, "Township_Road_\\3")
+    |> safe_replace(~r/\b(TWP|TOWNSHIP) (HWY|HIGHWAY) \#?(\d+)/i, "Township_Highway_\\3")
+    |> safe_replace(~r/\b(ST|STATE) (HWY|HIGHWAY) \#?(\d+)/i, "State_Highway_\\3")
+    |> safe_replace(~r/\bSTH \#?(\d+)/i, "State_Highway_\\1")
+    |> safe_replace(~r/\bSH \#?(\d+)/i, "State_Highway_\\1")
     # The prefix to ST|STATE avoids false positives like "MAIN ST RT 40"
-    |> safe_replace(~r/\bSTATE (RD|ROAD) (\d+)/i, "State_Road_\\2")
-    |> safe_replace(~r/\bSTATE (RT|RTE) (\d+)/i, "State_Route_\\2")
-    |> safe_replace(~r/(^|\&\s)ST (RD|ROAD) (\d+)/i, "\\1State_Road_\\3")
-    |> safe_replace(~r/(^|\&\s)ST (RT|RTE) (\d+)/i, "\\1State_Route_\\3")
-    |> safe_replace(~r/\b(RT|RTE|ROUTE) (\d+)/i, "Route_\\2")
-    |> safe_replace(~r/(\d+) (Hwy|Highway) (\d+)/i, "\\1 Highway_\\2")
-    |> safe_replace(~r/(\d+) (N|E|S|W) (Hwy|Highway) (\d+)/i, "\\1 \\2 Highway_\\3")
-    |> safe_replace(~r/\bSR (\d+)/i, standardize_sr(state))
-    |> safe_replace(~r/\bSR(\d+)/i, standardize_sr(state))
+    |> safe_replace(~r/\bSTATE (RD|ROAD) \#?(\d+)/i, "State_Road_\\2")
+    |> safe_replace(~r/\bSTATE (RT|RTE) \#?(\d+)/i, "State_Route_\\2")
+    |> safe_replace(~r/(^|\&\s)ST (RD|ROAD) \#?(\d+)/i, "\\1State_Road_\\3")
+    |> safe_replace(~r/(^|\&\s)ST (RT|RTE) \#?(\d+)/i, "\\1State_Route_\\3")
+    |> safe_replace(~r/\b(RT|RTE|ROUTE) \#?(\d+)/i, "Route_\\2")
+    # TODO: The digits and the directionals are only there if we standardize_highways at the beginning of the process not the way that standardize_address_list does it
+    # We can try doing standardize_highways at the beginning in those cases or we can make the digits optional in the regexes below.
+    # Or we can split out these four lines into new functions (with and without digits) and call them appropriately at the right time.
+    # |> safe_replace(~r/(\d+) Old (Hwy|Highway) \#?(\d+)/i, "\\1 Old_Highway_\\3")
+    # |> safe_replace(~r/(\d+) (N|E|S|W) Old (Hwy|Highway) \#?(\d+)/i, "\\1 \\2 Old_Highway_\\4")
+    # |> safe_replace(~r/(\d+) (Hwy|Highway) \#?(\d+)/i, "\\1 Highway_\\3")
+    # |> safe_replace(~r/(\d+) (N|E|S|W) (Hwy|Highway) \#?(\d+)/i, "\\1 \\2 Highway_\\4")
+    |> safe_replace(~r/\bSR \#?(\d+)/i, standardize_sr(state))
+    |> safe_replace(~r/\bSR\#?(\d+)/i, standardize_sr(state))
+    |> standardize_bare_highways(input)
+  end
+
+  defp standardize_bare_highways(street_addr_or_line, :line) do
+    street_addr_or_line
+    |> safe_replace(~r/(\d+) Old (Hwy|Highway) \#?(\d+)/i, "\\1 Old_Highway_\\3")
+    |> safe_replace(~r/(\d+) (N|E|S|W) Old (Hwy|Highway) \#?(\d+)/i, "\\1 \\2 Old_Highway_\\4")
+    |> safe_replace(~r/(\d+) (Hwy|Highway) \#?(\d+)/i, "\\1 Highway_\\3")
+    |> safe_replace(~r/(\d+) (N|E|S|W) (Hwy|Highway) \#?(\d+)/i, "\\1 \\2 Highway_\\4")
+  end
+
+  defp standardize_bare_highways(street_addr_or_line, :street_addr) do
+    street_addr_or_line
+    |> safe_replace(~r/Old (Hwy|Highway) \#?(\d+)/i, "Old_Highway_\\2")
+    |> safe_replace(~r/(Hwy|Highway) \#?(\d+)/i, "Highway_\\2")
   end
 
   def standardize_intersections(street_name) do

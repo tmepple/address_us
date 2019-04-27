@@ -54,9 +54,13 @@ defmodule AddressUS.Parser do
 
   def parse_address(messy_address) when not is_binary(messy_address), do: nil
 
-  def parse_address(messy_address) do
+  def parse_address(messy_address, state \\ "") do
+    # NOTE: We don't standardize_highways here because it's done later as part of `parse_address_list`
     address =
-      Standardizer.standardize_intersections(messy_address) |> Standardizer.standardize_address()
+      Standardizer.standardize_intersections(messy_address)
+      |> Standardizer.standardize_address()
+
+    # |> Standardizer.standardize_highways(state)
 
     log_term(address, "std addr")
     {postal, plus_4, address_no_postal} = CSZ.get_postal(address)
@@ -79,9 +83,12 @@ defmodule AddressUS.Parser do
   def parse_address_line(messy_address) when not is_binary(messy_address), do: nil
 
   def parse_address_line(messy_address, state \\ "") do
+    # NOTE: We don't standardize_highways here because it's done later as part of `parse_address_list`
+
     messy_address
     |> Standardizer.standardize_intersections()
     |> Standardizer.standardize_address()
+    # |> Standardizer.standardize_highways(state)
     |> log_term("std addr")
     |> String.split(" ")
     |> Enum.reverse()
@@ -125,7 +132,7 @@ defmodule AddressUS.Parser do
       if state == "WI" do
         Regex.match?(~r/^(\d+|[NEWS]\d+[NEWS]\d+\s|[NEWS]\d+\s)/, messy_address)
       else
-        Regex.match?(~r/^\d+/, messy_address)
+        Regex.match?(~r/^\d+\s/, messy_address)
       end
 
     ret_val =
