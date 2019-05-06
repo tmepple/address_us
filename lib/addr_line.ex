@@ -843,7 +843,7 @@ defmodule AddressUS.Parser.AddrLine do
 
     case {String.first(head), String.last(head), String.length(head)} do
       {"(", ")", len} when len > 2 ->
-        get_trailing_parens(tail, nil, String.slice(head, 1..-2), true)
+        get_trailing_parens(tail, backup, String.slice(head, 1..-2), true)
 
       {_any, ")", _len} ->
         get_trailing_parens(tail, backup, String.slice(head, 0..-2), false)

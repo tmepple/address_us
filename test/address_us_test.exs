@@ -1777,5 +1777,9 @@ defmodule AddressUSTest do
     assert desired_result == parse_address("1400 OLD HWY. 69 S., Cambridge City, IN")
   end
 
+  test "400 N. SEPULVEDA BLVD. (LOWER)" do
+    assert clean_address_line("400 N. SEPULVEDA BLVD. (LOWER)") == "400 N SEPULVEDA BLVD\nLOWER"
+  end
+
   # TODO: Add tests for all the new highway handling
 end
