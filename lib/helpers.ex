@@ -60,7 +60,7 @@ defmodule AddressUS.Parser.Helpers do
   def contains_po_box?(address) do
     [head | _] = address
     full_address = address |> Enum.join(" ") |> safe_upcase
-    !is_sec_unit_suffix_num_or_frac?(head) && String.match?(full_address, ~r/BOX/)
+    !is_sec_unit_suffix_num_or_frac?(head) && String.match?(full_address, ~r/BOX\s/)
   end
 
   # Determines if a value is a possible Suite value.
