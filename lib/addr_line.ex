@@ -632,7 +632,7 @@ defmodule AddressUS.Parser.AddrLine do
       get_suffix_value(tail_head) != nil && get_suffix_value(head) == nil ->
         cond do
           is_possible_suite_number?(head) &&
-              (String.length(tail_tail) < 2 ||
+              (String.length(hd(tail_tail)) < 2 ||
                  String.upcase(hd(tail_tail)) == "STATE") ->
             log_term(backup, "at 15")
             get_secondary(backup, backup, pmb, designator, value, addit, true)
