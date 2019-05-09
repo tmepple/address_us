@@ -65,10 +65,11 @@ defmodule AddressUS.Parser.Helpers do
 
   # Determines if a value is a possible Suite value.
   def is_possible_suite_number?(value) do
-    units = AddressUSConfig.secondary_units()
-    values = Map.values(units) |> Enum.map(&String.downcase(&1))
-    keys = Map.keys(units) |> Enum.map(&String.downcase(&1))
-    (values ++ keys) |> Enum.member?(String.downcase(value))
+    # units = AddressUSConfig.secondary_units()
+    # values = Map.values(units) |> Enum.map(&String.downcase(&1))
+    # keys = Map.keys(units) |> Enum.map(&String.downcase(&1))
+    # (values ++ keys) |> Enum.member?(String.downcase(value))
+    Enum.member?(AddressUSConfig.secondary_units_key_values(), String.downcase(value))
   end
 
   # Determines if a value is a number, fraction, or postal keyword.

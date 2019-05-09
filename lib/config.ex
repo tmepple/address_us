@@ -353,6 +353,61 @@ defmodule AddressUSConfig do
     }
   end
 
+  # Speeding up a hot-path... keep this in sync with secondary_units
+  # TODO create this at compile time with a module attribute!
+  def secondary_units_key_values do
+    [
+      "apt",
+      "bsmt",
+      "bldg",
+      "dept",
+      "fl",
+      "frnt",
+      "hngr",
+      "hngr",
+      "lbby",
+      "lot",
+      "lowr",
+      "ms",
+      "ofc",
+      "ph",
+      "pier",
+      "rear",
+      "rm",
+      "side",
+      "slip",
+      "spc",
+      "ste",
+      "trlr",
+      "unit",
+      "uppr",
+      "apartment",
+      "basement",
+      "building",
+      "department",
+      "floor",
+      "front",
+      "hangar",
+      "hanger",
+      "lobby",
+      "lot",
+      "lower",
+      "mailstop",
+      "office",
+      "penthouse",
+      "pier",
+      "rear",
+      "room",
+      "side",
+      "slip",
+      "space",
+      "suite",
+      "trailer",
+      "unit",
+      "upper"
+    ]
+  end
+
   def street_suffixes do
     %{
       "ALLEE" => "Aly",
