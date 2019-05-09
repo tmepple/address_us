@@ -7,11 +7,13 @@ defmodule AddressUS.Parser.AddrLine do
   # a Street struct.
   # p_val = possible secondary value
   # p_des = possible secondary designator
-  def parse_address_list(address, _state) when not is_list(address), do: nil
-  def parse_address_list([], _), do: nil
-  def parse_address_list([""], _), do: nil
+  # this line probably not needed as this is only called intra-library: def parse_address_list(address, state, casing \\ :title)
 
-  def parse_address_list(address, state) do
+  def parse_address_list(address, _state, _casing) when not is_list(address), do: nil
+  def parse_address_list([], _, _), do: nil
+  def parse_address_list([""], _, _), do: nil
+
+  def parse_address_list(address, state, casing) do
     cleaned_address =
       Enum.map(address, &safe_replace(&1, ",", ""))
       |> log_term("cleaned")
@@ -60,7 +62,7 @@ defmodule AddressUS.Parser.AddrLine do
           log_term({pv, pre_direction, suffix, nil, post_direction}, "second case")
 
         # If the Suffix is St or Dr (which would never be valid street names) leave it at suffix
-        {nil, _, pre, suf, _, _, _} when pre != nil and suf in ["St", "Dr"] ->
+        {nil, _, pre, suf, _, _, _} when pre != nil and suf in ["ST", "DR"] ->
           {raw_pre_direction, nil, suffix, p_val, post_direction}
 
         # Otherwise if the suffix is something else (like Blvd, Ct, etc) and there is a pre-direction
@@ -107,7 +109,7 @@ defmodule AddressUS.Parser.AddrLine do
 
     # If a post-direction was mistakenly taken from a Box, append it back on
     {final_name, post_direction} =
-      if final_name && String.starts_with?(final_name, "Box") && post_direction,
+      if final_name && String.starts_with?(final_name, "BOX") && post_direction,
         do: {final_name <> post_direction, nil},
         else: {final_name, post_direction}
 
@@ -134,15 +136,15 @@ defmodule AddressUS.Parser.AddrLine do
     log_term(final_secondary_value, "final_secondary_value")
 
     %Street{
-      secondary_designator: final_secondary_designator,
+      secondary_designator: apply_casing(final_secondary_designator, casing),
       post_direction: post_direction,
       pre_direction: pre_direction,
-      secondary_value: final_secondary_value,
-      pmb: pmb,
-      suffix: suffix,
+      secondary_value: apply_casing(final_secondary_value, casing),
+      pmb: apply_casing(pmb, casing),
+      suffix: apply_casing(suffix, casing),
       primary_number: primary_number,
-      name: final_name,
-      additional_designation: additional
+      name: apply_casing(final_name, casing),
+      additional_designation: apply_casing(additional, casing)
     }
   end
 
@@ -153,14 +155,13 @@ defmodule AddressUS.Parser.AddrLine do
 
   defp get_direction_value(value) do
     directions = AddressUSConfig.directions()
-    clean_value = title_case(value)
 
     cond do
-      safe_has_key?(directions, clean_value) ->
-        Map.get(directions, clean_value)
+      safe_has_key?(directions, value) ->
+        Map.get(directions, value)
 
-      Map.values(directions) |> Enum.member?(safe_upcase(clean_value)) ->
-        safe_upcase(clean_value)
+      Map.values(directions) |> Enum.member?(value) ->
+        value
 
       true ->
         ""
@@ -255,7 +256,7 @@ defmodule AddressUS.Parser.AddrLine do
       number == nil && string_is_number_or_fraction?(head) ->
         alphanumeric = "ABCDFHIJLKMOPQRGTUVXYZ1234567890"
 
-        case safe_contains?(alphanumeric, safe_upcase(tail_head)) do
+        case safe_contains?(alphanumeric, tail_head) do
           false ->
             get_number(tail, backup, head, box, p_val, p_des, true)
 
@@ -264,7 +265,7 @@ defmodule AddressUS.Parser.AddrLine do
             # a valid suffix (i.e. 4400 A Avenue) before assuming it's a secondary_value
             if get_suffix_value(tail_tail_head),
               do: get_number(tail, backup, head, box, p_val, p_des, true),
-              else: get_number(tail_tail, backup, head, box, safe_upcase(tail_head), p_des, true)
+              else: get_number(tail_tail, backup, head, box, tail_head, p_des, true)
         end
 
       number == nil && string_is_number_or_fraction?(safe_replace(head, regex, "\\1")) ->
@@ -359,17 +360,17 @@ defmodule AddressUS.Parser.AddrLine do
         )
 
       # Handle address like "1404 W Avenue E"
-      get_suffix_value(head) == "Ave" &&
+      get_suffix_value(head) == "AVE" &&
           (get_direction_value(tail_head) != "" or string_is_number_or_fraction?(tail_head)) ->
-        get_post_direction(backup, backup, nil, title_case(raw_pd), true)
+        get_post_direction(backup, backup, nil, raw_pd, true)
 
       # If there is only one term left (an address number) then we likely were too aggressive about
       # and we are not dealing with a post_direction anyway i.e. "101 W North" 
       address_length == 1 ->
-        get_post_direction(backup, backup, nil, title_case(raw_pd), true)
+        get_post_direction(backup, backup, nil, raw_pd, true)
 
       get_direction_value(head) == "" ->
-        get_post_direction(address, backup, post_direction, title_case(raw_pd), true)
+        get_post_direction(address, backup, post_direction, raw_pd, true)
 
       true ->
         get_post_direction(tail, backup, new_direction, append_string(raw_pd, head), false)
@@ -407,19 +408,19 @@ defmodule AddressUS.Parser.AddrLine do
       single_word_direction != "" && next_is_direction &&
           tail_tail_head_is_keyword ->
         log_term("at 1")
-        {single_word_direction, title_case(head), tail}
+        {single_word_direction, head, tail}
 
       single_word_direction != "" && next_is_direction &&
           tail_tail_head == nil ->
         log_term("at 2")
 
-        {single_word_direction, title_case(head), tail}
+        {single_word_direction, head, tail}
 
       single_word_direction != "" && next_is_direction &&
         !tail_tail_head_is_keyword && double_word_direction != "" ->
         log_term("at 3")
 
-        {double_word_direction, title_case(head <> tail_head), tail_tail}
+        {double_word_direction, head <> tail_head, tail_tail}
 
       # Following case happens with an illegal double direction (i.e. W N Michigan Rd)
       # Since it's an illegal direction we punt so these terms are pre-pended to the street name
@@ -434,7 +435,7 @@ defmodule AddressUS.Parser.AddrLine do
       single_word_direction != "" ->
         log_term("at 5")
 
-        {single_word_direction, title_case(head), tail}
+        {single_word_direction, head, tail}
 
       true ->
         {nil, nil, address}
@@ -522,15 +523,15 @@ defmodule AddressUS.Parser.AddrLine do
             get_secondary(tail, backup, pmb, designator, head, addit, false)
         end
 
-      safe_has_key?(units, title_case(head)) ->
+      safe_has_key?(units, head) ->
         cond do
-          safe_has_key?(suffixes, safe_upcase(value)) ->
+          safe_has_key?(suffixes, value) ->
             log_term("at 6")
             get_secondary(backup, backup, nil, nil, nil, addit, true)
 
           value ->
             log_term("at 6a")
-            get_secondary(tail, backup, pmb, Map.get(units, title_case(head)), value, addit, true)
+            get_secondary(tail, backup, pmb, Map.get(units, head), value, addit, true)
 
           # For the secondary parsing to work when a valid Unit is provided we need to have a value
           true ->
@@ -538,9 +539,9 @@ defmodule AddressUS.Parser.AddrLine do
             get_secondary(backup, backup, nil, nil, nil, addit, true)
         end
 
-      value && Map.values(units) |> Enum.member?(title_case(head)) ->
+      value && Map.values(units) |> Enum.member?(head) ->
         log_term("at 8")
-        get_secondary(tail, backup, pmb, title_case(head), value, addit, true)
+        get_secondary(tail, backup, pmb, head, value, addit, true)
 
       safe_starts_with?(head, "#") && !contains_po_box?(address) ->
         all_unit_values = Map.keys(units) ++ Map.values(units)
@@ -548,17 +549,17 @@ defmodule AddressUS.Parser.AddrLine do
         cond do
           # TODO: Other highway selectors belong here - but with risk of false positives
           # plan to add as real cases appear
-          Enum.member?(["Rt"], title_case(tail_head)) ->
+          Enum.member?(["RT"], tail_head) ->
             get_secondary(backup, backup, pmb, designator, nil, addit, true)
 
-          Enum.member?(all_unit_values, title_case(tail_head)) ->
+          Enum.member?(all_unit_values, tail_head) ->
             secondary_unit =
               cond do
-                Map.values(units) |> Enum.member?(title_case(tail_head)) ->
-                  title_case(tail_head)
+                Map.values(units) |> Enum.member?(tail_head) ->
+                  tail_head
 
                 true ->
-                  Map.get(units, title_case(tail_head))
+                  Map.get(units, tail_head)
               end
 
             log_term("at 9")
@@ -591,27 +592,27 @@ defmodule AddressUS.Parser.AddrLine do
         all_unit_values = Map.keys(units) ++ Map.values(units)
 
         cond do
-          Enum.member?(all_unit_values, title_case(tail_head)) ->
+          Enum.member?(all_unit_values, tail_head) ->
             secondary_unit =
               cond do
-                Map.values(units) |> Enum.member?(title_case(tail_head)) ->
-                  title_case(tail_head)
+                Map.values(units) |> Enum.member?(tail_head) ->
+                  tail_head
 
                 true ->
-                  Map.get(units, title_case(tail_head))
+                  Map.get(units, tail_head)
               end
 
             log_term("at 11")
             get_secondary(tail_tail, backup, pmb, secondary_unit, head <> value, addit, true)
 
-          Enum.member?(all_unit_values, title_case(head)) ->
+          Enum.member?(all_unit_values, head) ->
             secondary_unit =
               cond do
-                Map.values(units) |> Enum.member?(title_case(head)) ->
-                  title_case(head)
+                Map.values(units) |> Enum.member?(head) ->
+                  head
 
                 true ->
-                  Map.get(units, title_case(head))
+                  Map.get(units, head)
               end
 
             log_term("at 12")
@@ -623,8 +624,8 @@ defmodule AddressUS.Parser.AddrLine do
         end
 
       is_possible_suite_number?(tail_head) &&
-          (safe_has_key?(units, title_case(tail_head)) ||
-             Map.values(units) |> Enum.member?(title_case(tail_head))) ->
+          (safe_has_key?(units, tail_head) ||
+             Map.values(units) |> Enum.member?(tail_head)) ->
         log_term("at 14")
 
         get_secondary(tail, backup, pmb, designator, safe_replace(head, ",", ""), addit, false)
@@ -633,17 +634,17 @@ defmodule AddressUS.Parser.AddrLine do
         cond do
           is_possible_suite_number?(head) &&
               (String.length(hd(tail_tail)) < 2 ||
-                 String.upcase(hd(tail_tail)) == "STATE") ->
+                 hd(tail_tail) == "STATE") ->
             log_term(backup, "at 15")
             get_secondary(backup, backup, pmb, designator, value, addit, true)
 
-          Map.values(directions) |> Enum.member?(safe_upcase(head)) ||
-              safe_has_key?(directions, title_case(head)) ->
+          Map.values(directions) |> Enum.member?(head) ||
+              safe_has_key?(directions, head) ->
             log_term(backup, "at 16")
             get_secondary(backup, backup, pmb, designator, value, addit, true)
 
           # Handle "1400 W Avenue B"
-          get_suffix_value(tail_head) == "Ave" && String.length(head) == 1 ->
+          get_suffix_value(tail_head) == "AVE" && String.length(head) == 1 ->
             log_term(backup, "at 16a")
             get_secondary(backup, backup, pmb, designator, value, addit, true)
 
@@ -679,40 +680,42 @@ defmodule AddressUS.Parser.AddrLine do
   defp get_street(address), do: get_street(address, nil, false)
   defp get_street([], street, false), do: get_street([], street, true)
 
-  defp get_street(_address, street, true) do
-    corner_case_street_names = %{"PGA" => "PGA", "ROUTE" => "Route", "RT" => "Route"}
-    filtered_street = safe_upcase(street) |> safe_replace(~r/\s(\d+)/, "")
-    # directions = AddressUSConfig.directions()
-    # rev_directions = AddressUSConfig.reversed_directions()
+  defp get_street(_address, street, true), do: street
 
-    cond do
-      safe_has_key?(corner_case_street_names, filtered_street) ->
-        street_name =
-          Map.get(corner_case_street_names, filtered_street)
-          |> safe_replace(~r/\s(\d+)/, "")
+  # defp get_street(_address, street, true) do
+  #   corner_case_street_names = %{"PGA" => "PGA", "RT" => "ROUTE"}
+  #   filtered_street = street |> safe_replace(~r/\s(\d+)/, "")
+  #   # directions = AddressUSConfig.directions()
+  #   # rev_directions = AddressUSConfig.reversed_directions()
 
-        street_number = " " <> safe_replace(street, ~r/[a-zA-Z\s]+/, "")
-        (street_name <> street_number) |> safe_replace(~r/\s$/, "")
+  #   cond do
+  #     safe_has_key?(corner_case_street_names, filtered_street) ->
+  #       street_name =
+  #         Map.get(corner_case_street_names, filtered_street)
+  #         |> safe_replace(~r/\s(\d+)/, "")
 
-      # # Can't assume "E" street is "East" street -- if it were a directional it would have already
-      # # been parsed into the pre_direction field
-      #
-      # Enum.member?(
-      #   Map.keys(directions) ++ Map.values(directions),
-      #   title_case(street)
-      # ) ->
-      #   cond do
-      #     Map.has_key?(directions, title_case(street)) ->
-      #       title_case(street)
+  #       street_number = " " <> safe_replace(street, ~r/[a-zA-Z\s]+/, "")
+  #       (street_name <> street_number) |> safe_replace(~r/\s$/, "")
 
-      #     true ->
-      #       Map.get(rev_directions, String.upcase(street))
-      #   end
+  #     # # Can't assume "E" street is "East" street -- if it were a directional it would have already
+  #     # # been parsed into the pre_direction field
+  #     #
+  #     # Enum.member?(
+  #     #   Map.keys(directions) ++ Map.values(directions),
+  #     #   title_case(street)
+  #     # ) ->
+  #     #   cond do
+  #     #     Map.has_key?(directions, title_case(street)) ->
+  #     #       title_case(street)
 
-      true ->
-        street
-    end
-  end
+  #     #     true ->
+  #     #       Map.get(rev_directions, String.upcase(street))
+  #     #   end
+
+  #     true ->
+  #       street
+  #   end
+  # end
 
   defp get_street(address, street, false) do
     [head | tail] = address
@@ -732,11 +735,11 @@ defmodule AddressUS.Parser.AddrLine do
           cond do
             street_is_direction ->
               cond do
-                Map.has_key?(directions, title_case(head)) ->
-                  Map.get(rev_directions, Map.get(directions, title_case(head)))
+                Map.has_key?(directions, head) ->
+                  Map.get(rev_directions, Map.get(directions, head))
 
                 true ->
-                  Map.get(rev_directions, String.upcase(head))
+                  Map.get(rev_directions, head)
               end
 
             true ->
@@ -757,8 +760,8 @@ defmodule AddressUS.Parser.AddrLine do
       true ->
         new_address =
           cond do
-            street == nil -> title_case(head)
-            true -> street <> " " <> title_case(head)
+            street == nil -> head
+            true -> street <> " " <> head
           end
 
         get_street(tail, new_address, false)
@@ -781,7 +784,7 @@ defmodule AddressUS.Parser.AddrLine do
         get_suffix(address, nil, nil, true)
 
       new_suffix != nil ->
-        get_suffix(tail, new_suffix, title_case(head), true)
+        get_suffix(tail, new_suffix, head, true)
 
       true ->
         get_suffix(address, nil, nil, true)
@@ -793,16 +796,16 @@ defmodule AddressUS.Parser.AddrLine do
 
   defp get_suffix_value(value) do
     suffixes = AddressUSConfig.common_suffixes()
-    cleaned_value = title_case(value)
-    capitalized_keys = Map.keys(suffixes) |> Enum.map(&title_case(&1))
-    capitalized_values = Map.values(suffixes) |> Enum.map(&title_case(&1))
-    suffix_values = capitalized_keys ++ capitalized_values
+    # cleaned_value = title_case(value)
+    # capitalized_keys = Map.keys(suffixes) |> Enum.map(&title_case(&1))
+    # capitalized_values = Map.values(suffixes) |> Enum.map(&title_case(&1))
+    suffix_values = Map.keys(suffixes) ++ Map.values(suffixes)
 
     cond do
-      Enum.member?(suffix_values, cleaned_value) ->
-        case safe_has_key?(suffixes, safe_upcase(cleaned_value)) do
-          true -> Map.get(suffixes, safe_upcase(cleaned_value))
-          false -> cleaned_value
+      Enum.member?(suffix_values, value) ->
+        case safe_has_key?(suffixes, value) do
+          true -> Map.get(suffixes, value)
+          false -> value
         end
 
       true ->
@@ -828,11 +831,10 @@ defmodule AddressUS.Parser.AddrLine do
     all_unit_values = Map.keys(units) ++ Map.values(units)
     head = String.split(trailing_paren, " ") |> List.first()
 
-    if String.first(head) == "#" or Enum.member?(all_unit_values, title_case(head)) do
+    if String.first(head) == "#" or Enum.member?(all_unit_values, head) do
       {nil, Enum.map(backup, fn x -> String.replace(x, ~r/(\(|\))/, "") end)}
     else
-      {title_case(trailing_paren),
-       Enum.map(address, fn x -> String.replace(x, ~r/(\(|\))/, "") end)}
+      {trailing_paren, Enum.map(address, fn x -> String.replace(x, ~r/(\(|\))/, "") end)}
     end
   end
 
@@ -873,15 +875,14 @@ defmodule AddressUS.Parser.AddrLine do
   end
 
   # Detects if a string is a state or not.
-  defp is_state?(value) when not is_binary(value), do: false
+  defp is_state?(state) when not is_binary(state), do: false
 
-  defp is_state?(value) do
-    state = title_case(value)
+  defp is_state?(state) do
     states = AddressUSConfig.states()
 
     cond do
       safe_has_key?(states, state) -> true
-      Map.values(states) |> Enum.member?(safe_upcase(state)) -> true
+      Map.values(states) |> Enum.member?(state) -> true
       true -> false
     end
   end
@@ -892,21 +893,19 @@ defmodule AddressUS.Parser.AddrLine do
     {st, ad, su} =
       {street_name, additional, suffix}
       # |> safe_replace_first_elem(~r/\#/, "")
-      |> strip_regex_to_additional(~r/( |\-)Po Box \w+$/i)
-      |> strip_regex_to_additional(~r/( |\-)Box \w+$/i)
-      |> strip_regex_to_additional(~r/( |\-)Milepost (\w|\.)+$/i)
+      |> strip_regex_to_additional(~r/( |\-)PO BOX \w+$/i)
+      |> strip_regex_to_additional(~r/( |\-)BOX \w+$/i)
+      |> strip_regex_to_additional(~r/( |\-)MILEPOST (\w|\.)+$/i)
       |> strip_embedded_suffix()
 
-    {safe_replace(st, "_", " "), safe_replace(ad, "_", " ") |> title_case(), su}
+    {safe_replace(st, "_", " "), safe_replace(ad, "_", " "), su}
   end
 
   def strip_embedded_suffix({street_name, additional, nil} = tuple)
       when not is_nil(street_name) do
-    ucase_street_name = String.upcase(street_name)
-
     # Checking if the string contains a suffix string before going through the expensive operation
-    if String.contains?(ucase_street_name, AddressUSConfig.common_suffix_keys()) do
-      rev_street_list = ucase_street_name |> String.split(" ") |> Enum.reverse()
+    if String.contains?(street_name, AddressUSConfig.common_suffix_keys()) do
+      rev_street_list = street_name |> String.split(" ") |> Enum.reverse()
 
       # rev_last_suffix_index =
       #   Enum.find_index(rev_street_list, fn x -> Enum.member?(suf_list, x) end)
@@ -932,13 +931,12 @@ defmodule AddressUS.Parser.AddrLine do
         true ->
           street_list = Enum.reverse(rev_street_list)
           last_suffix_index = length(street_list) - 1 - rev_last_suffix_index
-          ret_street = Enum.take(street_list, last_suffix_index) |> Enum.join(" ") |> title_case()
+          ret_street = Enum.take(street_list, last_suffix_index) |> Enum.join(" ")
           ret_suffix = get_suffix_value(Enum.at(street_list, last_suffix_index))
 
           new_addtl =
             Enum.take(street_list, (length(street_list) - (last_suffix_index + 1)) * -1)
             |> Enum.join(" ")
-            |> title_case()
 
           ret_addtl = append_string_with_space(additional, new_addtl)
           {ret_street, ret_addtl, ret_suffix}

@@ -52,12 +52,16 @@ defmodule AddressUS.Parser do
   import AddressUS.Parser.Helpers
   alias AddressUS.Parser.{AddrLine, Standardizer, CSZ}
 
-  def parse_address(messy_address) when not is_binary(messy_address), do: nil
+  def parse_address(messy_address, casing \\ :title)
 
-  def parse_address(messy_address, state \\ "") do
+  def parse_address(messy_address, _casing) when not is_binary(messy_address), do: nil
+
+  def parse_address(messy_address, casing) do
     # NOTE: We don't standardize_highways here because it's done later as part of `parse_address_list`
     address =
-      Standardizer.standardize_intersections(messy_address)
+      messy_address
+      |> String.upcase()
+      |> Standardizer.standardize_intersections()
       |> Standardizer.standardize_address()
 
     # |> Standardizer.standardize_highways(state)
@@ -66,9 +70,15 @@ defmodule AddressUS.Parser do
     {postal, plus_4, address_no_postal} = CSZ.get_postal(address)
     {state, address_no_state} = CSZ.get_state(address_no_postal)
     {city, address_no_city} = CSZ.get_city(address_no_state)
-    street = AddrLine.parse_address_list(address_no_city, state)
+    street = AddrLine.parse_address_list(address_no_city, state, casing)
 
-    %Address{postal: postal, plus_4: plus_4, state: state, city: city, street: street}
+    %Address{
+      postal: postal,
+      plus_4: plus_4,
+      state: state,
+      city: apply_casing(city, casing),
+      street: street
+    }
   end
 
   @doc """
@@ -80,36 +90,43 @@ defmodule AddressUS.Parser do
       primary_number: "2345", secondary_designator: nil, secondary_value: nil,
       suffix: "St"}
   """
-  def parse_address_line(messy_address) when not is_binary(messy_address), do: nil
 
-  def parse_address_line(messy_address, state \\ "") do
+  def parse_address_line(messy_address, state \\ "", casing \\ :title)
+
+  def parse_address_line(messy_address, _state, _casing) when not is_binary(messy_address),
+    do: nil
+
+  def parse_address_line(messy_address, state, casing) do
     # NOTE: We don't standardize_highways here because it's done later as part of `parse_address_list`
 
     messy_address
+    |> String.upcase()
     |> Standardizer.standardize_intersections()
     |> Standardizer.standardize_address()
     # |> Standardizer.standardize_highways(state)
     |> log_term("std addr")
     |> String.split(" ")
     |> Enum.reverse()
-    |> AddrLine.parse_address_list(state)
+    |> AddrLine.parse_address_list(state, casing)
   end
 
   @doc """
   Standardizes the raw street portion of an address according to USPS suggestions for
   address parsing.  If given a state will apply custom standardizations (if they exist) for that state 
   """
-  def standardize_address_line(messy_address, state \\ "")
+  def standardize_address_line(messy_address, state \\ "", casing \\ :title)
 
-  def standardize_address_line(messy_address, _state) when not is_binary(messy_address), do: nil
+  def standardize_address_line(messy_address, _state, _casing) when not is_binary(messy_address),
+    do: nil
 
-  def standardize_address_line(messy_address, state) do
+  def standardize_address_line(messy_address, state, casing) do
     messy_address
+    |> String.upcase()
     |> Standardizer.standardize_intersections()
     |> Standardizer.standardize_address()
     |> Standardizer.standardize_highways(state)
     |> safe_replace("_", " ")
-    |> title_case()
+    |> apply_casing(casing)
   end
 
   @doc """
@@ -117,14 +134,15 @@ defmodule AddressUS.Parser do
   or if an intersection is given it will only standardize the address, otherwise it will first parse
   the address to standardize directionals, suffixes, and separate additional information.
   """
-  def clean_address_line(messy_address, state \\ "", opts \\ [])
+  def clean_address_line(messy_address, state \\ "", casing \\ :upper)
 
-  def clean_address_line(messy_address, _state, _opts) when not is_binary(messy_address), do: ""
+  def clean_address_line(messy_address, _state, _casing) when not is_binary(messy_address), do: ""
 
-  def clean_address_line(messy_address, state, opts) do
-    {upcase?, opts} = Keyword.pop(opts, :upcase, true)
-
-    messy_address = Standardizer.postpend_prepended_po_box(messy_address)
+  def clean_address_line(messy_address, state, casing) do
+    messy_address =
+      messy_address
+      |> String.upcase()
+      |> Standardizer.postpend_prepended_po_box()
 
     # NOTE: Check for WI explicitly to avoid every address in the country to face expensive regex
     # TODO: Benchmark
@@ -137,7 +155,7 @@ defmodule AddressUS.Parser do
 
     ret_val =
       if not valid_number? do
-        standardize_address_line(messy_address, state)
+        standardize_address_line(messy_address, state, casing)
       else
         # standardize only the intersection & AND AT @ and split
         split_address =
@@ -145,32 +163,32 @@ defmodule AddressUS.Parser do
 
         # if no & then just parse
         if length(split_address) == 1 do
-          parse_address_line_fmt(messy_address, state, opts)
+          parse_address_line_fmt(messy_address, state, casing)
         else
           # if there's a slash in the first item that's not a fraction then just standardize as there's too much ambiguity
           # on what the slash means
           if Regex.match?(~r/(\D\/|\/\D)/i, List.first(split_address)) do
-            standardize_address_line(messy_address, state)
+            standardize_address_line(messy_address, state, casing)
           else
             # run first portion through parse_address_line_fmt and second portion through standardize then recombine with " & "
             split_line =
-              parse_address_line_fmt(List.first(split_address), state, opts)
+              parse_address_line_fmt(List.first(split_address), state, casing)
               |> String.split("\n", parts: 2)
 
             if length(split_line) == 1 do
               List.first(split_line) <>
-                " & " <> standardize_address_line(List.last(split_address), state)
+                " & " <> standardize_address_line(List.last(split_address), state, casing)
             else
               List.first(split_line) <>
                 " & " <>
-                standardize_address_line(List.last(split_address), state) <>
+                standardize_address_line(List.last(split_address), state, casing) <>
                 "\n" <> List.last(split_line)
             end
           end
         end
       end
 
-    if upcase?, do: String.upcase(ret_val), else: ret_val
+    apply_casing(ret_val, casing)
   end
 
   @doc """
@@ -231,7 +249,7 @@ defmodule AddressUS.Parser do
   def abbreviate_state(nil), do: nil
 
   def abbreviate_state(raw_state) do
-    state = title_case(raw_state)
+    state = safe_upcase(raw_state)
 
     states = AddressUSConfig.states()
 
@@ -239,11 +257,11 @@ defmodule AddressUS.Parser do
       safe_has_key?(states, state) == true ->
         Map.get(states, state)
 
-      Enum.member?(Map.values(states), safe_upcase(state)) == true ->
-        safe_upcase(state)
+      Enum.member?(Map.values(states), state) == true ->
+        state
 
       true ->
-        state
+        title_case(state)
     end
   end
 
@@ -296,12 +314,16 @@ defmodule AddressUS.Parser do
   ## Private Functions
   ############################################################################
 
-  defp parse_address_line_fmt(messy_address, _state) when not is_binary(messy_address), do: nil
+  defp parse_address_line_fmt(messy_address, state \\ "", casing \\ :title, opts \\ [])
 
-  defp parse_address_line_fmt(messy_address, state \\ "", opts \\ []) do
+  defp parse_address_line_fmt(messy_address, _state, _casing, _opts)
+       when not is_binary(messy_address),
+       do: nil
+
+  defp parse_address_line_fmt(messy_address, state, casing, opts) do
     fmt_opt = Keyword.get(opts, :additional, :newline)
 
-    addr = parse_address_line(messy_address, state)
+    addr = parse_address_line(messy_address, state, casing)
 
     prim_line =
       [addr.primary_number, addr.pre_direction, addr.name, addr.suffix, addr.post_direction]

@@ -20,6 +20,10 @@ defmodule AddressUS.Parser.Helpers do
     |> String.trim()
   end
 
+  def apply_casing(str, :title), do: title_case(str)
+
+  def apply_casing(str, _), do: str
+
   # Cleans up hyphenated street values by removing the hyphen and returing the
   # values or the appropriate USPS abbreviations for said values in a list.
 
@@ -33,13 +37,13 @@ defmodule AddressUS.Parser.Helpers do
         sub_data = AddressUSConfig.street_name_subs()
         subs = Map.keys(sub_data) ++ Map.values(sub_data)
         values = value |> String.split("-")
-        truths = Enum.map(values, &Enum.member?(subs, safe_upcase(&1)))
+        truths = Enum.map(values, &Enum.member?(subs, &1))
 
         new_values =
           Enum.map(values, fn v ->
-            case safe_has_key?(sub_data, safe_upcase(v)) do
-              true -> title_case(Map.get(sub_data, safe_upcase(v)))
-              false -> title_case(v)
+            case safe_has_key?(sub_data, v) do
+              true -> Map.get(sub_data, v)
+              false -> v
             end
           end)
 
@@ -69,14 +73,13 @@ defmodule AddressUS.Parser.Helpers do
     # values = Map.values(units) |> Enum.map(&String.downcase(&1))
     # keys = Map.keys(units) |> Enum.map(&String.downcase(&1))
     # (values ++ keys) |> Enum.member?(String.downcase(value))
-    Enum.member?(AddressUSConfig.secondary_units_key_values(), String.downcase(value))
+    Enum.member?(AddressUSConfig.secondary_units_key_values(), value)
   end
 
   # Determines if a value is a number, fraction, or postal keyword.
-  def is_sec_unit_suffix_num_or_frac?(value) when not is_binary(value), do: false
+  def is_sec_unit_suffix_num_or_frac?(word) when not is_binary(word), do: false
 
-  def is_sec_unit_suffix_num_or_frac?(value) do
-    word = title_case(value)
+  def is_sec_unit_suffix_num_or_frac?(word) do
     units = AddressUSConfig.secondary_units()
     suffixes = AddressUSConfig.common_suffixes()
     keywords1 = Map.keys(units) ++ Map.values(units) ++ Map.values(suffixes)
@@ -85,7 +88,7 @@ defmodule AddressUS.Parser.Helpers do
     cond do
       string_is_number_or_fraction?(word) -> true
       Enum.member?(keywords1, word) -> true
-      Enum.member?(keywords2, safe_upcase(word)) -> true
+      Enum.member?(keywords2, word) -> true
       true -> false
     end
   end
@@ -125,24 +128,24 @@ defmodule AddressUS.Parser.Helpers do
   def title_case(value) when not is_binary(value), do: nil
 
   def title_case(value) do
-    word_endings = ["ST", "ND", "RD", "TH"]
+    # word_endings = ["ST", "ND", "RD", "TH"]
 
     cap_unless_us = fn word ->
-      if String.downcase(word) == "us", do: "US", else: String.capitalize(word)
+      if word in ["US", "FM", "PGA"], do: word, else: String.capitalize(word)
     end
 
     make_title_case = fn word ->
-      letters = safe_replace(word, ~r/\d+/, "")
+      # letters = safe_replace(word, ~r/\d+/, "")
 
       cond do
-        String.downcase(word) == "us" ->
-          "US"
+        word in ["US", "FM", "PGA"] ->
+          word
 
         String.contains?(word, "_") ->
           String.split(word, "_") |> Enum.map(&cap_unless_us.(&1)) |> Enum.join("_")
 
-        Regex.match?(~r/^(\d)/, word) && Enum.member?(word_endings, letters) ->
-          String.downcase(word)
+        # Regex.match?(~r/^(\d)/, word) && Enum.member?(word_endings, letters) ->
+        #   String.downcase(word)
 
         true ->
           String.split(word, "-")
@@ -155,6 +158,7 @@ defmodule AddressUS.Parser.Helpers do
     String.split(value, " ")
     |> Enum.map(&make_title_case.(&1))
     |> Enum.join(" ")
+    |> safe_replace("Po Box", "PO BOX")
   end
 
   # Determines if string can be cleanly converted into a number.
@@ -226,7 +230,7 @@ defmodule AddressUS.Parser.Helpers do
   end
 
   def log_term(term \\ nil, label) do
-    # Logger.debug(label <> ": " <> inspect(term))
+    Logger.debug(label <> ": " <> inspect(term))
     term
   end
 

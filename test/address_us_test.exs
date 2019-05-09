@@ -1452,7 +1452,7 @@ defmodule AddressUSTest do
       name: "Main",
       suffix: "St",
       primary_number: "301",
-      additional_designation: "Po Box 358"
+      additional_designation: "PO BOX 358"
     }
 
     assert desired_result == parse_address_line("301 Main Street PO Box 358")
@@ -1531,7 +1531,7 @@ defmodule AddressUSTest do
 
   test "700 South Box 6e" do
     desired_result = %Street{
-      name: "Box 6E",
+      name: "Box 6e",
       pre_direction: "S",
       primary_number: "700"
     }
@@ -1643,7 +1643,7 @@ defmodule AddressUSTest do
     desired_result = %Street{
       name: "Patterson",
       suffix: "St",
-      additional_designation: "Po Box 496",
+      additional_designation: "PO BOX 496",
       primary_number: "2709"
     }
 

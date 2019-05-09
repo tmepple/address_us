@@ -9,7 +9,7 @@ defmodule AddressUS.Parser.CSZ do
   def get_city([], backup, _city, false), do: {nil, backup}
 
   def get_city(address, _backup, city, true) do
-    {safe_replace(title_case(city), ",", ""), address}
+    {safe_replace(city, ",", ""), address}
   end
 
   def get_city(address, backup, city, false) do
@@ -49,7 +49,7 @@ defmodule AddressUS.Parser.CSZ do
         pre_keyword_white_list = ["SALT", "WEST", "PALM"]
 
         cond do
-          Enum.member?(pre_keyword_white_list, safe_upcase(tail_head)) ->
+          Enum.member?(pre_keyword_white_list, tail_head) ->
             get_city(tail, backup, merge_names(city, head), false)
 
           true ->
@@ -111,8 +111,8 @@ defmodule AddressUS.Parser.CSZ do
       safe_has_key?(states, state_to_evaluate) ->
         get_state(tail, address_backup, Map.get(states, state_to_evaluate), 0)
 
-      Enum.member?(Map.values(states), safe_upcase(state_to_evaluate)) ->
-        get_state(tail, address_backup, safe_upcase(state_to_evaluate), 0)
+      Enum.member?(Map.values(states), state_to_evaluate) ->
+        get_state(tail, address_backup, state_to_evaluate, 0)
 
       count == 1 ->
         get_state(address_backup, address_backup, nil, 0)
@@ -148,15 +148,14 @@ defmodule AddressUS.Parser.CSZ do
   ############################################################################
 
   # Gets direction abbreviation string.
-  defp get_direction_abbreviation(value) when not is_binary(value), do: nil
+  defp get_direction_abbreviation(val) when not is_binary(val), do: nil
 
-  defp get_direction_abbreviation(value) do
-    val = title_case(value)
+  defp get_direction_abbreviation(val) do
     directions = AddressUSConfig.directions()
 
     cond do
       safe_has_key?(directions, val) -> Map.get(directions, val)
-      Map.values(directions) |> Enum.member?(val) -> safe_upcase(val)
+      Map.values(directions) |> Enum.member?(val) -> val
       true -> nil
     end
   end
