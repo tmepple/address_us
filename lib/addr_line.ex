@@ -202,7 +202,7 @@ defmodule AddressUS.Parser.AddrLine do
         _ -> {hd(tail), tl(tail)}
       end
 
-    tail_tail_head = if length(tail_tail) > 0, do: hd(tail_tail), else: nil
+    tail_tail_head = if length(tail_tail) > 0, do: hd(tail_tail), else: ""
 
     # next_is_number =
     #   if length(tail) == 0 do
@@ -298,6 +298,29 @@ defmodule AddressUS.Parser.AddrLine do
 
         # get_number(tail, backup, h, box, secondary_value, "Ste", true)
         get_number(tail, backup, head, box, p_val, p_des, true)
+
+      # Wisconsin grid-style addresses
+      wisc =
+          Regex.run(
+            ~r/^([NEWS]\d+[NEWS]\d+|[NEWS]\d+\s[NEWS]\d+|[NEWS]\d+)\s\w/,
+            head <> " " <> tail_head <> " " <> tail_tail_head
+          ) ->
+        wisc_number = Enum.at(wisc, 1)
+
+        # Remove embedded space to assist geocoders which frequently break with the added space
+        if String.contains?(wisc_number, " ") do
+          get_number(
+            tail_tail,
+            backup,
+            String.replace(wisc_number, " ", ""),
+            box,
+            p_val,
+            p_des,
+            true
+          )
+        else
+          get_number(tail, backup, wisc_number, box, p_val, p_des, true)
+        end
 
       true ->
         get_number(tail, backup, number, box, p_val, p_des, false)

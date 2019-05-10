@@ -1781,5 +1781,21 @@ defmodule AddressUSTest do
     assert clean_address_line("400 N. SEPULVEDA BLVD. (LOWER)") == "400 N SEPULVEDA BLVD\nLOWER"
   end
 
+  test "W146N9300 Held Drive, Menomonee Falls, WI  53051" do
+    desired_result = %Address{
+      city: "Menomonee Falls",
+      state: "WI",
+      postal: "53051",
+      street: %Street{
+        name: "Held",
+        suffix: "Dr",
+        primary_number: "W146N9300"
+      }
+    }
+
+    assert desired_result == parse_address("W146N9300 Held Drive, Menomonee Falls, WI  53051")
+    assert desired_result == parse_address("W146 N9300 Held Drive, Menomonee Falls, WI  53051")
+  end
+
   # TODO: Add tests for all the new highway handling
 end
