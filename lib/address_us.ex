@@ -149,7 +149,7 @@ defmodule AddressUS.Parser do
     # if state == "WI" do
     valid_number? =
       Regex.match?(
-        ~r/^(\d+\s|[NEWS]\d+\s[NEWS]\d+\s|[NEWS]\d+[NEWS]\d+\s|[NEWS]\d+\s)/,
+        ~r/^(\d+|[NEWS]\d+\s[NEWS]\d+|[NEWS]\d+[NEWS]\d+|[NEWS]\d+|\d+[NEWS]\d+|[\d\-\/]+)\s/,
         messy_address
       )
 

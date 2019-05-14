@@ -62,6 +62,8 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/,(\S)/, ", \\1")
     |> safe_replace(~r/\s,(\S)/, ", \\1")
     |> safe_replace(~r/(\S),\s/, "\\1, ")
+    # remove hypens that are surrounded by spaces and tighten if spaces appear on one side
+    |> safe_replace(~r/\s\-+\s/, " ")
     |> safe_replace(~r/-\s+/, "-")
     |> safe_replace(~r/\s+\-/, "-")
     # |> safe_replace(~r/\.(\S)/, ". \\1")
@@ -73,9 +75,12 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/P\. O\. BOX/, "PO BOX")
     |> safe_replace(~r/PO BOX(\d+)/, "PO BOX \\1")
     |> safe_replace(~r/POB (\d+)/, "PO BOX \\1")
+    |> safe_replace(~r/(RR|HC)\s?(\d+)\,\s?BOX\s?(\d+)/, "\\1 \\2 BOX \\3")
+
     # remove periods that are not adjacent to digits
-    |> safe_replace(~r/(?!\d)\.(?!\d)/, "")
+    |> safe_replace(~r/(?!\d)\.(?!\d)/, " ")
     |> safe_replace(~r/\s,\s/, ", ")
+    |> safe_replace("  ", " ")
     |> String.trim()
   end
 

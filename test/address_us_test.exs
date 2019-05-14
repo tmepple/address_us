@@ -1797,5 +1797,19 @@ defmodule AddressUSTest do
     assert desired_result == parse_address("W146 N9300 Held Drive, Menomonee Falls, WI  53051")
   end
 
-  # TODO: Add tests for all the new highway handling
+  test "149  W.CRAWFORD AVE" do
+    assert clean_address_line("149  W.CRAWFORD AVENUE") == "149 W CRAWFORD AVE"
+  end
+
+  test "2561 - 190TH STREET" do
+    assert clean_address_line("2561 - 190TH STREET") == "2561 190TH ST"
+  end
+
+  test "2021-1/2 E 4th Street" do
+    assert clean_address_line("2012-1/2 E 4th Street") == "2012 1/2 E 4TH ST"
+  end
+
+  test "RR 1, BOX 241" do
+    assert clean_address_line("RR 1, BOX 241") == "RR 1 BOX 241"
+  end
 end

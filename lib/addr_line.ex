@@ -240,6 +240,7 @@ defmodule AddressUS.Parser.AddrLine do
       #   get_number(tl(tail), backup, head <> " " <> hd(tail), box, p_val, p_des, true)
 
       number == nil && string_is_number_or_fraction?(head) && next_is_fraction ->
+        log_term("get_number - 1")
         get_number(tl(tail), backup, head <> " " <> hd(tail), box, p_val, p_des, true)
 
       Enum.member?(address, "&") ->
@@ -254,6 +255,8 @@ defmodule AddressUS.Parser.AddrLine do
         get_number(new_address, backup, nil, box, p_val, p_des, false)
 
       number == nil && string_is_number_or_fraction?(head) ->
+        log_term("get_number - 2")
+        tail_head = safe_replace(tail_head, ~r/\(([A-Z0-9])\)/, "\\1")
         alphanumeric = "ABCDFHIJLKMOPQRGTUVXYZ1234567890"
 
         case safe_contains?(alphanumeric, tail_head) do
@@ -268,7 +271,52 @@ defmodule AddressUS.Parser.AddrLine do
               else: get_number(tail_tail, backup, head, box, tail_head, p_des, true)
         end
 
+      # number == nil && string_is_number_or_fraction?(safe_replace(head, regex, "\\1")) ->
+      #   endings = ["ST", "ND", "RD", "TH"]
+      #   new_number = safe_replace(head, regex, "\\1")
+      #   new_value = safe_replace(head, regex, "\\2")
+
+      #   case Enum.member?(endings, new_value) do
+      #     false ->
+      #       get_number(tail, backup, new_number, box, new_value, p_des, true)
+
+      #     true ->
+      #       get_number(backup, backup, number, box, new_value, p_des, true)
+      #   end
+
+      number == nil && is_state?(head) ->
+        log_term("get_number - 3")
+
+        get_number(address, backup, number, box, p_val, p_des, true)
+
+      # Grid-style addresses (usually seen in Wisconsin)
+      grid =
+          Regex.run(
+            ~r/^([NEWS]\d+[NEWS]\d+|[NEWS]\d+\s[NEWS]\d+|[NEWS]\d+|\d+[NEWS]\d+)\s\w/,
+            head <> " " <> tail_head <> " " <> tail_tail_head
+          ) ->
+        log_term("get_number - 4")
+
+        grid_number = Enum.at(grid, 1)
+
+        # Remove embedded space to assist geocoders which frequently break with the added space
+        if String.contains?(grid_number, " ") do
+          get_number(
+            tail_tail,
+            backup,
+            String.replace(grid_number, " ", ""),
+            box,
+            p_val,
+            p_des,
+            true
+          )
+        else
+          get_number(tail, backup, grid_number, box, p_val, p_des, true)
+        end
+
       number == nil && string_is_number_or_fraction?(safe_replace(head, regex, "\\1")) ->
+        log_term("get_number - 5")
+
         endings = ["ST", "ND", "RD", "TH"]
         new_number = safe_replace(head, regex, "\\1")
         new_value = safe_replace(head, regex, "\\2")
@@ -281,46 +329,14 @@ defmodule AddressUS.Parser.AddrLine do
             get_number(backup, backup, number, box, new_value, p_des, true)
         end
 
-      number == nil && is_state?(head) ->
-        get_number(address, backup, number, box, p_val, p_des, true)
-
-      # If there is a dash in the number, just return the whole thing including the dash
+      # If there is a dash in the number and the second part is not a fraction just return the whole thing including the dash
       # It might be an address range (i.e. 101-102 E Washington) or it could be a valid Brooklyn-style address
-      # (59-36 Cooper Ave, Glendale, NY 11385)
+      # (59-36 Cooper Ave, Glendale, NY 11385).  If it is a fraction ("212-1/2 1st St") then replace dash with space.
       safe_contains?(head, "-") ->
-        # [h | t] = String.split("-")
+        log_term("get_number - 6")
 
-        # secondary_value =
-        #   case length(t) do
-        #     0 -> nil
-        #     _ -> hd(tail)
-        #   end
-
-        # get_number(tail, backup, h, box, secondary_value, "Ste", true)
+        head = safe_replace(head, ~r/^(\d+)\-(\d+\/\d+)$/, "\\1 \\2")
         get_number(tail, backup, head, box, p_val, p_des, true)
-
-      # Wisconsin grid-style addresses
-      wisc =
-          Regex.run(
-            ~r/^([NEWS]\d+[NEWS]\d+|[NEWS]\d+\s[NEWS]\d+|[NEWS]\d+)\s\w/,
-            head <> " " <> tail_head <> " " <> tail_tail_head
-          ) ->
-        wisc_number = Enum.at(wisc, 1)
-
-        # Remove embedded space to assist geocoders which frequently break with the added space
-        if String.contains?(wisc_number, " ") do
-          get_number(
-            tail_tail,
-            backup,
-            String.replace(wisc_number, " ", ""),
-            box,
-            p_val,
-            p_des,
-            true
-          )
-        else
-          get_number(tail, backup, wisc_number, box, p_val, p_des, true)
-        end
 
       true ->
         get_number(tail, backup, number, box, p_val, p_des, false)
