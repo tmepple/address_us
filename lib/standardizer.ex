@@ -10,6 +10,7 @@ defmodule AddressUS.Parser.Standardizer do
   def standardize_address(messy_address) do
     messy_address
     # |> safe_replace(~r/ United STATEs$/, "")
+    |> safe_replace(~r/^\#\s?/, "")
     |> safe_replace(~r/ UNITED STATES$/, "")
     |> safe_replace(~r/ US$/, "")
     # |> safe_replace(~r/US$/, "")
@@ -69,7 +70,9 @@ defmodule AddressUS.Parser.Standardizer do
     # |> safe_replace(~r/(\S)\.\s/, "\\1. ")
     |> safe_replace(~r/P O BOX/, "PO BOX")
     |> safe_replace(~r/P\.O\.BOX/, "PO BOX")
+    |> safe_replace(~r/P\. O\. BOX/, "PO BOX")
     |> safe_replace(~r/PO BOX(\d+)/, "PO BOX \\1")
+    |> safe_replace(~r/POB (\d+)/, "PO BOX \\1")
     # remove periods that are not adjacent to digits
     |> safe_replace(~r/(?!\d)\.(?!\d)/, "")
     |> safe_replace(~r/\s,\s/, ", ")
@@ -137,9 +140,11 @@ defmodule AddressUS.Parser.Standardizer do
 
   def standardize_intersections(street_name) do
     street_name
+    |> safe_replace(~r/\&AMP\;/, " & ")
     |> safe_replace(~r/\sAND\s/, " & ")
     |> safe_replace(~r/\sAT\s/, " & ")
     |> safe_replace(~r/\@/, " & ")
+    |> safe_replace(~r/^JCT\.? (OF )?(.+\&.+)/, "\\2")
   end
 
   def postpend_prepended_po_box(messy_address) do

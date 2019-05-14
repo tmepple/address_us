@@ -146,15 +146,16 @@ defmodule AddressUS.Parser do
 
     # NOTE: Check for WI explicitly to avoid every address in the country to face expensive regex
     # TODO: Benchmark
+    # if state == "WI" do
     valid_number? =
-      if state == "WI" do
-        Regex.match?(
-          ~r/^(\d+\s|[NEWS]\d+\s[NEWS]\d+\s|[NEWS]\d+[NEWS]\d+\s|[NEWS]\d+\s)/,
-          messy_address
-        )
-      else
-        Regex.match?(~r/^\d+\s/, messy_address)
-      end
+      Regex.match?(
+        ~r/^(\d+\s|[NEWS]\d+\s[NEWS]\d+\s|[NEWS]\d+[NEWS]\d+\s|[NEWS]\d+\s)/,
+        messy_address
+      )
+
+    # else
+    #  Regex.match?(~r/^\d+\s/, messy_address)
+    # end
 
     ret_val =
       if not valid_number? do
