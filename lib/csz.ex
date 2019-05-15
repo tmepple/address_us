@@ -75,15 +75,16 @@ defmodule AddressUS.Parser.CSZ do
 
   # Gets the postal code from an address and returns
   # {zip, zip_plus_4, leftover_address_list}.
-  def get_postal(address) when not is_binary(address), do: {nil, nil, nil}
+  def get_postal(address) when not is_list(address), do: {nil, nil, nil}
 
   def get_postal(address) do
-    reversed_address = Enum.reverse(String.split(address, " "))
-    [possible_postal | leftover_address] = reversed_address
+    # The following line is now done in the caller as it's more explicit
+    # reversed_address = Enum.reverse(String.split(address, " "))
+    [possible_postal | leftover_address] = address
     {postal, plus_4} = parse_postal(possible_postal)
 
     case postal do
-      nil -> {nil, nil, reversed_address}
+      nil -> {nil, nil, address}
       _ -> {postal, plus_4, leftover_address}
     end
   end

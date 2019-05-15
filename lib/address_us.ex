@@ -64,11 +64,26 @@ defmodule AddressUS.Parser do
       |> Standardizer.standardize_intersections()
       |> Standardizer.standardize_address()
 
-    # |> Standardizer.standardize_highways(state)
+    # |> Standardizer.standardize_highways("")
 
     log_term(address, "std addr")
+    address = Enum.reverse(String.split(address, " "))
     {postal, plus_4, address_no_postal} = CSZ.get_postal(address)
     {state, address_no_state} = CSZ.get_state(address_no_postal)
+
+    # OPTIMIZE: This is likely not good for performance but without refactoring get_postal and get_state this was the easiest way
+    # to standardize the highways after we extract the State. 
+    address_no_state =
+      if address_no_state do
+        Enum.reverse(address_no_state)
+        |> Enum.join(" ")
+        |> Standardizer.standardize_highways(state)
+        |> String.split(" ")
+        |> Enum.reverse()
+      else
+        nil
+      end
+
     {city, address_no_city} = CSZ.get_city(address_no_state)
     street = AddrLine.parse_address_list(address_no_city, state, casing)
 
@@ -103,7 +118,7 @@ defmodule AddressUS.Parser do
     |> String.upcase()
     |> Standardizer.standardize_intersections()
     |> Standardizer.standardize_address()
-    # |> Standardizer.standardize_highways(state)
+    |> Standardizer.standardize_highways(state)
     |> log_term("std addr")
     |> String.split(" ")
     |> Enum.reverse()

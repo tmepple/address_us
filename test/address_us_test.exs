@@ -758,6 +758,9 @@ defmodule AddressUSTest do
     assert desired_result == result
   end
 
+  # NOTE: The new highway standardization code must treat the next term after "County Road" as part of the name since
+  # frequently the county roads are named with sequences of letters (which may include N, S, E, and W) and "County Road" is
+  # part of the name -- so we don't want the Road taken out as a suffix.  This test was modified to support that.
   test "Parse address: 14 County Road North East, Suite 22, Casper, WY
       82609" do
     desired_result = %Address{
@@ -765,12 +768,11 @@ defmodule AddressUSTest do
       state: "WY",
       postal: "82609",
       street: %Street{
-        name: "County",
+        name: "County Road North",
         primary_number: "14",
-        post_direction: "NE",
+        post_direction: "E",
         secondary_designator: "Ste",
-        secondary_value: "22",
-        suffix: "Rd"
+        secondary_value: "22"
       }
     }
 
@@ -1394,9 +1396,8 @@ defmodule AddressUSTest do
       state: "IN",
       postal: "47341",
       street: %Street{
-        name: "US Highway 27",
-        primary_number: "114",
-        post_direction: "N"
+        name: "US Highway 27n",
+        primary_number: "114"
       }
     }
 
