@@ -1782,7 +1782,7 @@ defmodule AddressUSTest do
     assert clean_address_line("400 N. SEPULVEDA BLVD. (LOWER)") == "400 N SEPULVEDA BLVD\nLOWER"
   end
 
-  test "W146N9300 Held Drive, Menomonee Falls, WI  53051" do
+  test "W146N9300 Held Drive, Menomonee Falls, WI  53051 and W146 N9300 Held Drive" do
     desired_result = %Address{
       city: "Menomonee Falls",
       state: "WI",
@@ -1812,5 +1812,19 @@ defmodule AddressUSTest do
 
   test "RR 1, BOX 241" do
     assert clean_address_line("RR 1, BOX 241") == "RR 1 BOX 241"
+  end
+
+  test "W5871 COUNTY HWY VV, SHELDON, WI  54766" do
+    desired_result = %Address{
+      city: "Sheldon",
+      state: "WI",
+      postal: "54766",
+      street: %Street{
+        name: "County Highway Vv",
+        primary_number: "W5871"
+      }
+    }
+
+    assert desired_result == parse_address("W5871 COUNTY HWY VV, SHELDON, WI  54766")
   end
 end
