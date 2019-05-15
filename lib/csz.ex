@@ -24,51 +24,71 @@ defmodule AddressUS.Parser.CSZ do
 
     cond do
       String.contains?(head, ")") or String.contains?(head, "(") ->
+        log_term("at 1")
         get_city(address, backup, city, true)
 
       is_sec_unit_suffix_num_or_frac?(head) && city == nil ->
+        log_term("at 2")
         get_city(tail, backup, merge_names(city, head), false)
 
       String.ends_with?(tail_head, ",") ->
+        log_term("at 3")
         get_city(tail, backup, merge_names(city, head), true)
 
       head |> safe_starts_with?("#") ->
+        log_term("at 4")
         get_city(address, backup, city, true)
 
       Enum.count(clean_hyphenated_street(head)) > 1 ->
+        log_term("at 5")
         get_city(address, backup, city, true)
 
       city != nil && !is_sec_unit_suffix_num_or_frac?(head) && address != [] &&
           is_possible_suite_number?(tail_head) ->
+        log_term("at 6")
+        get_city(address, backup, city, true)
+
+      city != nil && !is_sec_unit_suffix_num_or_frac?(head) && address != [] &&
+          is_highway?(head) ->
+        log_term("at 6a")
         get_city(address, backup, city, true)
 
       city != nil && !is_sec_unit_suffix_num_or_frac?(head) && address != [] ->
+        log_term("at 7")
         get_city(tail, backup, merge_names(city, head), false)
 
       city != nil && is_sec_unit_suffix_num_or_frac?(head) ->
+        log_term("at 8")
         pre_keyword_white_list = ["SALT", "WEST", "PALM"]
 
         cond do
           Enum.member?(pre_keyword_white_list, tail_head) ->
+            log_term("at 9")
             get_city(tail, backup, merge_names(city, head), false)
 
           true ->
+            log_term("at 10")
             get_city(address, backup, city, true)
         end
 
       is_sec_unit_suffix_num_or_frac?(head) ->
+        log_term("at 11")
         get_city(address, backup, city, true)
 
       contains_po_box?(tail) ->
+        log_term("at 12")
         get_city(tail, backup, head, true)
 
       tail == [] ->
+        log_term("at 13")
         get_city(address, backup, city, true)
 
       get_direction_abbreviation(head) != nil ->
+        log_term("at 14")
         get_city(tail, backup, merge_names(city, head), false)
 
       true ->
+        log_term("at 15")
         get_city(tail, backup, merge_names(city, head), false)
     end
   end

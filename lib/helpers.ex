@@ -67,6 +67,12 @@ defmodule AddressUS.Parser.Helpers do
     !is_sec_unit_suffix_num_or_frac?(head) && String.match?(full_address, ~r/BOX\s/)
   end
 
+  def is_highway?(word) when not is_binary(word), do: false
+
+  def is_highway?(word) do
+    String.contains?(word, "_")
+  end
+
   # Determines if a value is a possible Suite value.
   def is_possible_suite_number?(value) do
     # units = AddressUSConfig.secondary_units()
@@ -230,7 +236,7 @@ defmodule AddressUS.Parser.Helpers do
   end
 
   def log_term(term \\ nil, label) do
-    # Logger.debug(label <> ": " <> inspect(term))
+    Logger.debug(label <> ": " <> inspect(term))
     term
   end
 

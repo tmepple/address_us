@@ -64,8 +64,6 @@ defmodule AddressUS.Parser do
       |> Standardizer.standardize_intersections()
       |> Standardizer.standardize_address()
 
-    # |> Standardizer.standardize_highways("")
-
     log_term(address, "std addr")
     address = Enum.reverse(String.split(address, " "))
     {postal, plus_4, address_no_postal} = CSZ.get_postal(address)
@@ -112,8 +110,6 @@ defmodule AddressUS.Parser do
     do: nil
 
   def parse_address_line(messy_address, state, casing) do
-    # NOTE: We don't standardize_highways here because it's done later as part of `parse_address_list`
-
     messy_address
     |> String.upcase()
     |> Standardizer.standardize_intersections()

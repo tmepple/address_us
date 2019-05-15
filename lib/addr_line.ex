@@ -90,11 +90,6 @@ defmodule AddressUS.Parser.AddrLine do
 
     log_term({final_name, final_secondary_val}, "final_name, secondary_val")
 
-    # # TODO: Should we do this here or at the beginning of the process in address_us.ex
-    # final_name = Standardizer.standardize_highways(final_name, state, :street_addr)
-
-    # log_term(final_name, "after standardizing highways")
-
     # In case the suffix wasn't parsed out due to extraneous designations still present in the street name
     # 5875 CASTLE CREEK PKWY DR BLDG 4 STE 195 is a good test -- Bldg 4 should be removed to additional
     # and 1040 A AVE FREEMAN FIELD
@@ -690,16 +685,16 @@ defmodule AddressUS.Parser.AddrLine do
           true ->
             log_term(backup, "at 17")
 
-            # get_secondary(backup, backup, pmb, designator, value, addit, true)
-            get_secondary(
-              tail,
-              backup,
-              pmb,
-              designator,
-              value,
-              append_string_with_space(addit, head),
-              true
-            )
+            get_secondary(backup, backup, pmb, designator, value, addit, true)
+            # get_secondary(
+            #   tail,
+            #   backup,
+            #   pmb,
+            #   designator,
+            #   value,
+            #   append_string_with_space(addit, head),
+            #   true
+            # )
         end
 
       tail_head == "&" ->
@@ -957,15 +952,6 @@ defmodule AddressUS.Parser.AddrLine do
         # If the first term in the street name is a suffix then ignore (as it's really the street name)
         rev_last_suffix_index == length(rev_street_list) - 1 ->
           tuple
-
-        # TODO: REMOVE - NO LONGER NEEDED
-        # Don't mangle Highways
-        # Enum.member?(
-        #   ["COUNTY", "STATE", "US"],
-        #   Enum.at(rev_street_list, rev_last_suffix_index + 1)
-        # ) ->
-        #   IO.puts("here!")
-        #   tuple
 
         true ->
           street_list = Enum.reverse(rev_street_list)

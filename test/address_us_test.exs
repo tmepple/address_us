@@ -1827,4 +1827,34 @@ defmodule AddressUSTest do
 
     assert desired_result == parse_address("W5871 COUNTY HWY VV, SHELDON, WI  54766")
   end
+
+  test "544 UNITED STATES HIGHWAY 31 N" do
+    assert clean_address_line("544 UNITED STATES HIGHWAY 31 N") == "544 US HIGHWAY 31 N"
+  end
+
+  test "2500 N. ST. MARY'S" do
+    assert clean_address_line("2500 N. ST. MARY'S") == "2500 N ST MARYS"
+  end
+
+  test "500' W OF TEMPLE ON SR 104" do
+    assert clean_address_line("500' W OF TEMPLE ON SR 104") ==
+             "500 FT W OF TEMPLE ON STATE ROUTE 104"
+  end
+
+  test "150 Ho'okele St, Kahului, HI 96732" do
+    assert clean_address_line("150 Ho'okele St") == "150 HOOKELE ST"
+  end
+
+  test "W5871 COUNTY HWY VV WAUSAU WI" do
+    desired_result = %Address{
+      city: "Wausau",
+      state: "WI",
+      street: %Street{
+        name: "County Highway Vv",
+        primary_number: "W5871"
+      }
+    }
+
+    assert desired_result == parse_address("W5871 COUNTY HWY VV WAUSAU WI")
+  end
 end
