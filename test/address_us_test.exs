@@ -1857,4 +1857,31 @@ defmodule AddressUSTest do
 
     assert desired_result == parse_address("W5871 COUNTY HWY VV WAUSAU WI")
   end
+
+  test "11300 - 88TH AVENUE" do
+    assert clean_address_line("11300 - 88TH AVENUE") == "11300 88TH AVE"
+  end
+
+  # Ensure single commas hugging suffixes properly remove to additional designation
+  test "81 MORRIS ROAD, HIGHWAY 51 SOUTH" do
+    assert clean_address_line("81 MORRIS ROAD, HIGHWAY 51 SOUTH") ==
+             "81 MORRIS RD\nHIGHWAY 51 SOUTH"
+  end
+
+  test "81 SR 55, MAIN ST" do
+    assert clean_address_line("81 SR 55, MAIN ST") == "81 STATE ROUTE 55\nMAIN ST"
+  end
+
+  test "" do
+    desired_result = %Address{
+      city: "Glen Arbor",
+      state: "MI",
+      street: %Street{
+        name: "M-22",
+        primary_number: "6281"
+      }
+    }
+
+    assert desired_result == parse_address("6281 M 22, Glen Arbor, MI")
+  end
 end

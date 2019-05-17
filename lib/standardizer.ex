@@ -59,13 +59,14 @@ defmodule AddressUS.Parser.Standardizer do
     # |> safe_replace(~r/(\D)\//, "\\1 ")
     |> safe_replace(~r/\"/, "")
     # Apostrophes or backticks against a number with a non-number afterwards usually refer to feet.  Otherwise remove them.
-    |> safe_replace(~r/(\d+)[\'\`]\s?(\D)/, "\\1 FT \\2")
+    |> safe_replace(~r/(\d+)[\'\`]\s(\D)/, "\\1 FT \\2")
     |> safe_replace(~r/[\'\`]/, "")
     |> safe_replace(~r/\s+/, " ")
     |> safe_replace(~r/,(\S)/, ", \\1")
     |> safe_replace(~r/\s,(\S)/, ", \\1")
     |> safe_replace(~r/(\S),\s/, "\\1, ")
-    # remove hypens that are surrounded by spaces and tighten if spaces appear on one side
+    # tighten hypens and remove them if they are surrounded on either side by words that are not all digits
+    |> safe_replace(~r/\b(\d+)\s?\-\s?(\d+)\b/, "\\1-\\2")
     |> safe_replace(~r/\s\-+\s/, " ")
     |> safe_replace(~r/-\s+/, "-")
     |> safe_replace(~r/\s+\-/, "-")
@@ -75,9 +76,11 @@ defmodule AddressUS.Parser.Standardizer do
     # |> safe_replace(~r/(\S)\.\s/, "\\1. ")
     |> safe_replace(~r/P O BOX/, "PO BOX")
     |> safe_replace(~r/P\.O\.BOX/, "PO BOX")
+    |> safe_replace(~r/P\.O\. BOX/, "PO BOX")
     |> safe_replace(~r/P\. O\. BOX/, "PO BOX")
     |> safe_replace(~r/PO BOX(\d+)/, "PO BOX \\1")
     |> safe_replace(~r/POB (\d+)/, "PO BOX \\1")
+    |> safe_replace(~r/[\/\-]PO BOX/, " PO BOX")
     |> safe_replace(~r/(RR|HC)\s?(\d+)\,\s?BOX\s?(\d+)/, "\\1 \\2 BOX \\3")
 
     # remove periods that are not adjacent to digits
@@ -138,6 +141,8 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/(\d+) (N|E|S|W) OLD (HWY|HIGHWAY) \#?(\d+)/, "\\1 \\2 OLD_HIGHWAY_\\4")
     |> safe_replace(~r/(\d+) (HWY|HIGHWAY) \#?(\d+)/, "\\1 HIGHWAY_\\3")
     |> safe_replace(~r/(\d+) (N|E|S|W) (HWY|HIGHWAY) \#?(\d+)/, "\\1 \\2 HIGHWAY_\\4")
+    # Some highways are a single letter (not NEWS) followed by a number which usually should have a dash but sometimes that's omitted
+    |> safe_replace(~r/^(\d+) ([NEWS]\s)?((?![NEWS])[A-Z])\s(\d+)\b/, "\\1 \\2\\3-\\4")
   end
 
   defp standardize_bare_highways(street_addr_or_line, :street_addr) do
@@ -153,6 +158,33 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\sAT\s/, " & ")
     |> safe_replace(~r/\@/, " & ")
     |> safe_replace(~r/^JCT\.? (OF )?(.+\&.+)/, "\\2")
+  end
+
+  @doc """
+  If there is a single comma in the addr hugging a suffix or highway, remove the trailing part to parenthesis as it is 
+  an additional designation not suitable for normal parsing.  The parser will then remove the parenthetical to a second address line.
+  """
+  def parenthesize_single_comma_hugging_suffix(addr) do
+    split_by_commas = String.split(addr, ",")
+
+    case length(split_by_commas) do
+      1 ->
+        addr
+
+      2 ->
+        [first | [last]] = split_by_commas
+        possible_suffix_or_hwy = first |> String.split(" ") |> List.last()
+
+        if AddressUS.Parser.AddrLine.get_suffix_value(possible_suffix_or_hwy) ||
+             String.contains?(possible_suffix_or_hwy, "_") do
+          first <> " (" <> last <> ")"
+        else
+          addr
+        end
+
+      _more ->
+        addr
+    end
   end
 
   def postpend_prepended_po_box(messy_address) do

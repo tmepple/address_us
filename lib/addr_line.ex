@@ -826,9 +826,10 @@ defmodule AddressUS.Parser.AddrLine do
   end
 
   # Returns the appropriate suffix value if one is found.
-  defp get_suffix_value(value) when not is_binary(value), do: nil
+  # NOTE: this is a public function as it can be called externally to validate if a word is a suffix
+  def get_suffix_value(value) when not is_binary(value), do: nil
 
-  defp get_suffix_value(value) do
+  def get_suffix_value(value) do
     suffixes = AddressUSConfig.common_suffixes()
     # cleaned_value = title_case(value)
     # capitalized_keys = Map.keys(suffixes) |> Enum.map(&title_case(&1))

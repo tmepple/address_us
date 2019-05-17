@@ -115,6 +115,10 @@ defmodule AddressUS.Parser do
     |> Standardizer.standardize_intersections()
     |> Standardizer.standardize_address()
     |> Standardizer.standardize_highways(state)
+    # Text following a single comma hugging a suffix (ie 12 MAIN ST, HIGHWAY 31 S) is likely additional information which
+    # causes issues when parsed (i.e. 12 MAIN ST S) so we should parenthesize it here so when it gets parsed it is properly
+    # called an "additional designation"
+    |> Standardizer.parenthesize_single_comma_hugging_suffix()
     |> log_term("std addr")
     |> String.split(" ")
     |> Enum.reverse()
@@ -169,7 +173,7 @@ defmodule AddressUS.Parser do
     # end
 
     ret_val =
-      if not valid_number? do
+      if not valid_number? or not max_one_comma_hugging_suffix_or_hwy?(messy_address) do
         standardize_address_line(messy_address, state, casing)
       else
         # standardize only the intersection & AND AT @ and split
@@ -204,6 +208,32 @@ defmodule AddressUS.Parser do
       end
 
     apply_casing(ret_val, casing)
+  end
+
+  def max_one_comma_hugging_suffix_or_hwy?(addr) do
+    split_by_commas = String.split(addr, ",")
+
+    case length(split_by_commas) do
+      1 ->
+        true
+
+      2 ->
+        possible_suffix_or_hwy =
+          split_by_commas
+          |> List.first()
+          # Next line a little inefficient (since it will be repeated) but only happens if single comma exists in address
+          |> Standardizer.standardize_highways("")
+          |> String.split(" ")
+          |> List.last()
+
+        if AddressUS.Parser.AddrLine.get_suffix_value(possible_suffix_or_hwy) ||
+             String.contains?(possible_suffix_or_hwy, "_"),
+           do: true,
+           else: false
+
+      _more ->
+        false
+    end
   end
 
   @doc """
@@ -325,6 +355,23 @@ defmodule AddressUS.Parser do
     |> Enum.into(%{})
   end
 
+  @doc "Given a street struct will return a tuple of formatted strings for the addr and addr2"
+  def addr_and_addr2_from_street(%Street{} = addr) do
+    prim_line =
+      [addr.primary_number, addr.pre_direction, addr.name, addr.suffix, addr.post_direction]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.join(" ")
+      |> String.trim()
+
+    sec_line =
+      [addr.pmb, addr.secondary_designator, addr.secondary_value, addr.additional_designation]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.join(" ")
+      |> String.trim()
+
+    {prim_line, sec_line}
+  end
+
   ############################################################################
   ## Private Functions
   ############################################################################
@@ -338,19 +385,9 @@ defmodule AddressUS.Parser do
   defp parse_address_line_fmt(messy_address, state, casing, opts) do
     fmt_opt = Keyword.get(opts, :additional, :newline)
 
-    addr = parse_address_line(messy_address, state, casing)
+    street = parse_address_line(messy_address, state, casing)
 
-    prim_line =
-      [addr.primary_number, addr.pre_direction, addr.name, addr.suffix, addr.post_direction]
-      |> Enum.reject(&is_nil/1)
-      |> Enum.join(" ")
-      |> String.trim()
-
-    sec_line =
-      [addr.pmb, addr.secondary_designator, addr.secondary_value, addr.additional_designation]
-      |> Enum.reject(&is_nil/1)
-      |> Enum.join(" ")
-      |> String.trim()
+    {prim_line, sec_line} = addr_and_addr2_from_street(street)
 
     case {fmt_opt, sec_line} do
       {_ad, sl} when sl == "" -> prim_line
