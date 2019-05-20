@@ -159,18 +159,11 @@ defmodule AddressUS.Parser do
       |> String.upcase()
       |> Standardizer.postpend_prepended_po_box()
 
-    # NOTE: Check for WI explicitly to avoid every address in the country to face expensive regex
-    # TODO: Benchmark
-    # if state == "WI" do
     valid_number? =
       Regex.match?(
         ~r/^(\d+|[NEWS]\d+\s[NEWS]\d+|[NEWS]\d+[NEWS]\d+|[NEWS]\d+|\d+[NEWS]\d+|[\d\-\/]+)\s/,
         messy_address
       )
-
-    # else
-    #  Regex.match?(~r/^\d+\s/, messy_address)
-    # end
 
     ret_val =
       if not valid_number? or not max_one_comma_hugging_suffix_or_hwy?(messy_address) do

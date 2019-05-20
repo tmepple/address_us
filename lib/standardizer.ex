@@ -86,6 +86,8 @@ defmodule AddressUS.Parser.Standardizer do
     # remove periods that are not adjacent to digits
     |> safe_replace(~r/(?!\d)\.(?!\d)/, " ")
     |> safe_replace(~r/\s,\s/, ", ")
+    |> safe_replace(~r/^(\d+) (THROUGH|THRU) (\d+)\s/, "\\1-\\3 ")
+    |> safe_replace(~r/\b(S|N)\.(E|W)\./, "\\1\\2")
     |> safe_replace("  ", " ")
     |> String.trim()
   end
@@ -106,7 +108,7 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\bUS(-| )\#?(\d+)/, "US_HIGHWAY_\\2")
     |> safe_replace(~r/\bUS (HWY|HIGHWAY) \#?(\d+)/, "US_HIGHWAY_\\2")
     # |> safe_replace(~r/\bUS HIGHWAY (\d+)/, "US_HIGHWAY_\\1")
-    |> safe_replace(~r/\b(FM|FARM TO MARKET|FARM TO MKT|HWY FM) \#?(\d+)/, "FM_\\2")
+    |> safe_replace(~r/\b(FM|FARM TO MARKET|FARM TO MKT|HWY FM|FMR) \#?(\d+)/, "FM_\\2")
     |> safe_replace(~r/\bCR \#?([\dA-Z]+)/, "COUNTY_ROAD_\\1")
     |> safe_replace(~r/\b(CO|COUNTY|CNTY|CTY) (RD|ROAD) \#?([\dA-Z]+)/, "COUNTY_ROAD_\\3")
     |> safe_replace(~r/\b(CO|COUNTY|CNTY|CTY) (HWY|HIGHWAY) \#?([\dA-Z]+)/, "COUNTY_HIGHWAY_\\3")
@@ -137,10 +139,16 @@ defmodule AddressUS.Parser.Standardizer do
 
   defp standardize_bare_highways(street_addr_or_line, :line) do
     street_addr_or_line
-    |> safe_replace(~r/(\d+) OLD (HWY|HIGHWAY) \#?(\d+)/, "\\1 OLD_HIGHWAY_\\3")
-    |> safe_replace(~r/(\d+) (N|E|S|W) OLD (HWY|HIGHWAY) \#?(\d+)/, "\\1 \\2 OLD_HIGHWAY_\\4")
-    |> safe_replace(~r/(\d+) (HWY|HIGHWAY) \#?(\d+)/, "\\1 HIGHWAY_\\3")
-    |> safe_replace(~r/(\d+) (N|E|S|W) (HWY|HIGHWAY) \#?(\d+)/, "\\1 \\2 HIGHWAY_\\4")
+    |> safe_replace(~r/(HWY|HIGHWAY) \#?(\d+)/, "HIGHWAY_\\2")
+    # The following four lines were simplified into the line above and all tests pass but are kept for now just in case
+    # |> safe_replace(~r/(\d+) OLD (HWY|HIGHWAY) \#?(\d+)/, "\\1 OLD_HIGHWAY_\\3")
+    # |> safe_replace(~r/(\d+) (N|E|S|W) OLD (HWY|HIGHWAY) \#?(\d+)/, "\\1 \\2 OLD_HIGHWAY_\\4")
+    # |> safe_replace(~r/(\d+) (HWY|HIGHWAY) \#?(\d+)/, "\\1 HIGHWAY_\\3")
+    # |> safe_replace(~r/(\d+) (N|E|S|W) (HWY|HIGHWAY) \#?(\d+)/, "\\1 \\2 HIGHWAY_\\4")
+
+    # x MILE ROAD
+    |> safe_replace(~r/(\d+) (\d+) MILE (ROAD|RD)/, "\\1 \\2_MILE_RD")
+
     # Some highways are a single letter (not NEWS) followed by a number which usually should have a dash but sometimes that's omitted
     |> safe_replace(~r/^(\d+) ([NEWS]\s)?((?![NEWS])[A-Z])\s(\d+)\b/, "\\1 \\2\\3-\\4")
   end

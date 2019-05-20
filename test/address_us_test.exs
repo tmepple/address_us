@@ -1872,7 +1872,7 @@ defmodule AddressUSTest do
     assert clean_address_line("81 SR 55, MAIN ST") == "81 STATE ROUTE 55\nMAIN ST"
   end
 
-  test "" do
+  test "6281 M 22, Glen Arbor, MI" do
     desired_result = %Address{
       city: "Glen Arbor",
       state: "MI",
@@ -1883,5 +1883,22 @@ defmodule AddressUSTest do
     }
 
     assert desired_result == parse_address("6281 M 22, Glen Arbor, MI")
+  end
+
+  test "8422 AR HWY 89 SOUTH" do
+    assert clean_address_line("8422 AR HWY 89 SOUTH") == "8422 AR HIGHWAY 89 S"
+  end
+
+  test "420 THRU 429 MAIN STREET" do
+    assert clean_address_line("420 THRU 429 MAIN STREET") == "420-429 MAIN ST"
+  end
+
+  test "Directionals like 506 S. 1ST S.E." do
+    assert clean_address_line("506 S. 1ST S.E.") == "506 S 1ST SE"
+    assert clean_address_line("716 N.E. HWY 66") == "716 NE HIGHWAY 66"
+  end
+
+  test "3421 8 Mile Road" do
+    assert clean_address_line("3421 8 Mile Road") == "3421 8 MILE RD"
   end
 end
