@@ -81,12 +81,15 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/PO BOX(\d+)/, "PO BOX \\1")
     |> safe_replace(~r/POB (\d+)/, "PO BOX \\1")
     |> safe_replace(~r/[\/\-]PO BOX/, " PO BOX")
+    |> safe_replace(~r/^R R /, "RR ")
     |> safe_replace(~r/(RR|HC)\s?(\d+)\,\s?BOX\s?(\d+)/, "\\1 \\2 BOX \\3")
 
     # remove periods that are not adjacent to digits
     |> safe_replace(~r/(?!\d)\.(?!\d)/, " ")
     |> safe_replace(~r/\s,\s/, ", ")
     |> safe_replace(~r/^(\d+) (THROUGH|THRU) (\d+)\s/, "\\1-\\3 ")
+    |> safe_replace(~r/^(\d+) (\d+) (ST|ND|RD|TH)\s/, "\\1 \\2\\3 ")
+    # Handle N.E., S.W., etc
     |> safe_replace(~r/\b(S|N)\.(E|W)\./, "\\1\\2")
     |> safe_replace("  ", " ")
     |> String.trim()
@@ -174,24 +177,24 @@ defmodule AddressUS.Parser.Standardizer do
   """
   def parenthesize_single_comma_hugging_suffix(addr) do
     split_by_commas = String.split(addr, ",")
+    split_by_slash = String.split(addr, "/")
 
-    case length(split_by_commas) do
-      1 ->
-        addr
+    case {length(split_by_commas), length(split_by_slash)} do
+      {2, _} -> parenthesize_if_suffix(split_by_commas, addr)
+      {_, 2} -> parenthesize_if_suffix(split_by_slash, addr)
+      _ -> addr
+    end
+  end
 
-      2 ->
-        [first | [last]] = split_by_commas
-        possible_suffix_or_hwy = first |> String.split(" ") |> List.last()
+  defp parenthesize_if_suffix(split_addr, addr) do
+    [first | [last]] = split_addr
+    possible_suffix_or_hwy = first |> String.split(" ") |> List.last()
 
-        if AddressUS.Parser.AddrLine.get_suffix_value(possible_suffix_or_hwy) ||
-             String.contains?(possible_suffix_or_hwy, "_") do
-          first <> " (" <> last <> ")"
-        else
-          addr
-        end
-
-      _more ->
-        addr
+    if AddressUS.Parser.AddrLine.get_suffix_value(possible_suffix_or_hwy) ||
+         String.contains?(possible_suffix_or_hwy, "_") do
+      first <> " (" <> last <> ")"
+    else
+      addr
     end
   end
 

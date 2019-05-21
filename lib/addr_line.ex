@@ -287,8 +287,10 @@ defmodule AddressUS.Parser.AddrLine do
       # Grid-style addresses (usually seen in Wisconsin)
       grid =
           Regex.run(
-            ~r/^([NEWS]\d+[NEWS]\d+|[NEWS]\d+\s[NEWS]\d+|[NEWS]\d+|\d+[NEWS]\d+)\s\w/,
-            head <> " " <> tail_head <> " " <> tail_tail_head
+            # ~r/^([NEWS]\d+[NEWS]\d+|[NEWS]\d+\s[NEWS]\d+|[NEWS]\d+|\d+[NEWS]\d+)\s\w/,
+            ~r/^([NEWS]\d+[NEWS]\d+|[NEWS]\d+\s[NEWS]\d+|[NEWS]\d+|\d+[NEWS]\d+)/,
+            # <> " " <> tail_tail_head
+            head <> " " <> tail_head
           ) ->
         log_term("get_number - 4")
 

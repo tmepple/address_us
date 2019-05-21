@@ -1751,7 +1751,7 @@ defmodule AddressUSTest do
   # With the embedded slash since this could be a intersection it's only standardized not parsed.
   test "127 WEST JASPER ST/US HWY 24 W" do
     assert clean_address_line("127 WEST JASPER ST/US HWY 24 W") ==
-             "127 W JASPER ST/US HIGHWAY 24 W"
+             "127 W JASPER ST\nUS HIGHWAY 24 W"
   end
 
   test "2128 MOUNDS ROAD & STATE ROAD 109" do
@@ -1900,5 +1900,18 @@ defmodule AddressUSTest do
 
   test "3421 8 Mile Road" do
     assert clean_address_line("3421 8 Mile Road") == "3421 8 MILE RD"
+  end
+
+  test "8101 MOUNT HOLLY ROAD/HIGHWAY 27" do
+    assert clean_address_line("8101 MOUNT HOLLY ROAD/HIGHWAY 27") ==
+             "8101 MOUNT HOLLY RD\nHIGHWAY 27"
+  end
+
+  test "86 12 TH ST" do
+    assert clean_address_line("86 12 TH STREET") == "86 12TH ST"
+  end
+
+  test "3N320 & 3N319 12TH ST" do
+    assert clean_address_line("3N320 & 3N319 12TH ST") == "3N320 & 3N319 12TH ST"
   end
 end
