@@ -159,6 +159,8 @@ defmodule AddressUS.Parser do
       |> String.upcase()
       # underscores and pipes are special characters in our future processing so ensure neither exists in the source address
       |> String.replace(~r[\_\|], " ")
+      # In FRS the number is frequently scrunched up against the first word -- if it's 3 chars or more it's not a unit or directional
+      |> String.replace(~r/^(\d+)([A-Z]{3,})/, "\\1 \\2")
       |> Standardizer.postpend_prepended_po_box()
 
     valid_number? =
@@ -369,9 +371,22 @@ defmodule AddressUS.Parser do
   @doc "Given a street struct will return a tuple of formatted strings for the addr and addr2"
   def addr_and_addr2_from_street(%Street{} = addr) do
     {primary_number, secondary_value} =
-      if addr.secondary_value != nil and addr.secondary_designator == nil,
-        do: {addr.primary_number <> "-" <> addr.secondary_value, nil},
-        else: {addr.primary_number, addr.secondary_value}
+      case {addr.secondary_value, addr.secondary_designator} do
+        {"M", nil} ->
+          {addr.primary_number <> "M", nil}
+
+        {val, nil} when not is_nil(val) ->
+          if Integer.parse(val) == :error,
+            do: {addr.primary_number <> "-" <> addr.secondary_value, nil},
+            else: {addr.primary_number <> " " <> addr.secondary_value, nil}
+
+        _other ->
+          {addr.primary_number, addr.secondary_value}
+      end
+
+    # if addr.secondary_value != nil and addr.secondary_designator == nil,
+    #   do: {addr.primary_number <> "-" <> addr.secondary_value, nil},
+    #   else: {addr.primary_number, addr.secondary_value}
 
     prim_line =
       [primary_number, addr.pre_direction, addr.name, addr.suffix, addr.post_direction]

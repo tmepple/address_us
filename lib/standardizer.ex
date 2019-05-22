@@ -22,6 +22,7 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\sMLK\s/, " MARTIN LUTHER KING ")
     |> safe_replace(~r/\sMLKING\s/, " MARTIN LUTHER KING ")
     |> safe_replace(~r/\sML KING\s/, " MARTIN LUTHER KING ")
+    |> safe_replace(~r/^\((.+)\)$/, "\\1")
     |> safe_replace(~r/(.+)\(/, "\\1 (")
     |> safe_replace(~r/\)(.+)/, ") \\1")
     # NOTE: Don't remove parenthesis yet
@@ -94,8 +95,10 @@ defmodule AddressUS.Parser.Standardizer do
     # Handle N.E., S.W., etc
     |> safe_replace(~r/\b(S|N)\.(E|W)\./, "\\1\\2")
     # If the street number has a letter appended to it, seperate it with a space (if a directional) or a dash (if not)
-    |> safe_replace(~r/^(\d+)((?![NEWS])[A-Z])\s/, "\\1-\\2 ")
+    |> safe_replace(~r/^(\d+)((?![NEWSM])[A-Z])\s/, "\\1-\\2 ")
     |> safe_replace(~r/^(\d+)([NEWS])\s/, "\\1 \\2 ")
+    ## In FRS the number is frequently scrunched up against the first word -- if it's 3 chars or more it's not a unit or directional
+    |> safe_replace(~r/^(\d+)([A-Z]{3,})/, "\\1 \\2")
     |> safe_replace("  ", " ")
     |> String.trim()
   end
@@ -113,6 +116,7 @@ defmodule AddressUS.Parser.Standardizer do
     # |> safe_replace(~r/\#/, "")
     |> safe_replace(~r/\bI(-| )(\d+)/, "INTERSTATE_\\2")
     |> safe_replace(~r/\bI(\d+)/, "INTERSTATE_\\1")
+    |> safe_replace(~r/\bI\s?H\s?(\d+)/, "INTERSTATE_\\1")
     |> safe_replace(~r/\bUS(-| )\#?(\d+)/, "US_HIGHWAY_\\2")
     |> safe_replace(~r/\bUS (HWY|HIGHWAY) \#?(\d+)/, "US_HIGHWAY_\\2")
     # |> safe_replace(~r/\bUS HIGHWAY (\d+)/, "US_HIGHWAY_\\1")

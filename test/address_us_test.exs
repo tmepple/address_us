@@ -1885,60 +1885,47 @@ defmodule AddressUSTest do
     assert desired_result == parse_address("6281 M 22, Glen Arbor, MI")
   end
 
-  test "8422 AR HWY 89 SOUTH" do
+  test "Clean address lines" do
     assert clean_address_line("8422 AR HWY 89 SOUTH") == "8422 AR HIGHWAY 89 S"
-  end
 
-  test "420 THRU 429 MAIN STREET" do
     assert clean_address_line("420 THRU 429 MAIN STREET") == "420-429 MAIN ST"
-  end
 
-  test "Directionals like 506 S. 1ST S.E." do
+    # Directionals like 506 S. 1ST S.E.
     assert clean_address_line("506 S. 1ST S.E.") == "506 S 1ST SE"
     assert clean_address_line("716 N.E. HWY 66") == "716 NE HIGHWAY 66"
-  end
 
-  test "3421 8 Mile Road" do
     assert clean_address_line("3421 8 Mile Road") == "3421 8 MILE RD"
-  end
 
-  test "8101 MOUNT HOLLY ROAD/HIGHWAY 27" do
     assert clean_address_line("8101 MOUNT HOLLY ROAD/HIGHWAY 27") ==
              "8101 MOUNT HOLLY RD\nHIGHWAY 27"
-  end
 
-  test "86 12 TH ST" do
     assert clean_address_line("86 12 TH STREET") == "86 12TH ST"
-  end
 
-  test "3N320 & 3N319 12TH ST" do
     assert clean_address_line("3N320 & 3N319 12TH ST") == "3N320 & 3N319 12TH ST"
-  end
 
-  test "R R #1" do
     assert clean_address_line("R R #1") == "RR 1"
-  end
 
-  # Test slash handling including an intersection.  If the slash is right after a suffix then likely the intersection is
-  # additional information after a good address and should be moved to the second line.
-  test "106 BROADWAY ST/US 231 & SR 50" do
+    # Test slash handling including an intersection.  If the slash is right after a suffix then likely the intersection is
+    # additional information after a good address and should be moved to the second line.
     assert clean_address_line("106 BROADWAY ST/US 231 & SR 50", "IN") ==
              "106 BROADWAY ST\nUS HIGHWAY 231 & STATE ROAD 50"
 
     assert clean_address_line("106 BROADWAY/US 231 & SR 50", "IN") ==
              "106 BROADWAY/US HIGHWAY 231 & STATE ROAD 50"
-  end
 
-  test "C.R. 500 E AND 900 N" do
     assert clean_address_line("C.R. 500 E AND 900 N") == "COUNTY ROAD 500 E & 900 N"
-  end
 
-  test "906A S PETERCHEFF ST" do
     assert clean_address_line("906A S PETERCHEFF STREET") == "906-A S PETERCHEFF ST"
     assert clean_address_line("906-A S PETERCHEFF STREET") == "906-A S PETERCHEFF ST"
-  end
 
-  test "906S WASHINGTON AVENUE" do
     assert clean_address_line("906S WASHINGTON AVENUE") == "906 S WASHINGTON AVE"
+
+    assert clean_address_line("1M S OF HWY 44") == "1M S OF HIGHWAY 44"
+
+    assert clean_address_line("22423 I H 45") == "22423 INTERSTATE 45"
+
+    # Don't capture a second number in an address like this as a secondary value set off with a dash
+    assert clean_address_line("147 3 RD11 E OF EX 11") == "147 3 RD11 E OF EX 11"
+    assert clean_address_line("102600GLOBE ROAD") == "102600 GLOBE RD"
   end
 end
