@@ -311,6 +311,15 @@ defmodule AddressUS.Parser.AddrLine do
           get_number(tail, backup, grid_number, box, p_val, p_des, true)
         end
 
+      # # If there is a dash in the number and the second part is not a fraction just return the whole thing including the dash
+      # # It might be an address range (i.e. 101-102 E Washington) or it could be a valid Brooklyn-style address
+      # # (59-36 Cooper Ave, Glendale, NY 11385).  If it is a fraction ("212-1/2 1st St") then replace dash with space.
+      # safe_contains?(head, "-") ->
+      #   log_term("get_number - 6")
+
+      #   head = safe_replace(head, ~r/^(\d+)\-(\d+\/\d+)$/, "\\1 \\2")
+      #   get_number(tail, backup, head, box, p_val, p_des, true)
+
       number == nil && string_is_number_or_fraction?(safe_replace(head, regex, "\\1")) ->
         log_term("get_number - 5")
 

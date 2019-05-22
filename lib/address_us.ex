@@ -157,30 +157,39 @@ defmodule AddressUS.Parser do
     messy_address =
       messy_address
       |> String.upcase()
+      # underscores and pipes are special characters in our future processing so ensure neither exists in the source address
+      |> String.replace(~r[\_\|], " ")
       |> Standardizer.postpend_prepended_po_box()
 
     valid_number? =
       Regex.match?(
-        ~r/^(\d+|[NEWS]\d+\s[NEWS]\d+|[NEWS]\d+[NEWS]\d+|[NEWS]\d+|\d+[NEWS]\d+|[\d\-\/]+)\s/,
+        ~r/^(\d+|[NEWS]\d+\s[NEWS]\d+|[NEWS]\d+[NEWS]\d+|[NEWS]\d+|\d+[NEWS]\d+|\d+[A-Z]|\d+\-[A-Z]|[\d\-\/]+)\s/,
         messy_address
       )
 
+    # If there's no valid number of if the address has more than one commas + slashes or if it has a comma or slash that
+    # is not pinned up against a suffix then it's too complex to attempt parsing so just standardize it.
     ret_val =
-      if not valid_number? or not max_one_comma_hugging_suffix_or_hwy?(messy_address) do
+      if not valid_number? or not max_one_comma_slash_hugging_suffix_or_hwy?(messy_address) do
         standardize_address_line(messy_address, state, casing)
       else
         # standardize only the intersection & AND AT @ and split
         split_address =
           Standardizer.standardize_intersections(messy_address) |> String.split(" & ", parts: 2)
 
-        # if no & then just parse
+        # if no & is found (thus it's not an intersection) then just parse it
         if length(split_address) == 1 do
           parse_address_line_fmt(messy_address, state, casing)
         else
-          # if there's a slash in the first item that's not a fraction then just standardize as there's too much ambiguity
-          # on what the slash means
-          if Regex.match?(~r/(\D\/|\/\D)/i, List.first(split_address)) do
-            standardize_address_line(messy_address, state, casing)
+          # if there's a slash in the first item that's not a fraction then check to see if it's hugging a suffix or highway
+          # if so then the intersection is additional information and is put in line 2.  If not then we should just standardize
+          # as there is too much ambiguity. 
+          if Regex.match?(~r/(\D\/|\/\D)/, List.first(split_address)) do
+            if max_one_comma_slash_hugging_suffix_or_hwy?(List.first(split_address)) do
+              parse_address_line_fmt(messy_address, state, casing)
+            else
+              standardize_address_line(messy_address, state, casing)
+            end
           else
             # run first portion through parse_address_line_fmt and second portion through standardize then recombine with " & "
             split_line =
@@ -203,30 +212,39 @@ defmodule AddressUS.Parser do
     apply_casing(ret_val, casing)
   end
 
-  def max_one_comma_hugging_suffix_or_hwy?(addr) do
+  def max_one_comma_slash_hugging_suffix_or_hwy?(addr) do
     split_by_commas = String.split(addr, ",")
+    split_by_slashes = String.replace(addr, ~r/(\d\/|\/\d)/, "|") |> String.split("/")
+    # if Regex.match?(~r/(\D\/|\/\D)/i, addr), do: String.split(addr, "/"), else: ["unimportant"]
 
-    case length(split_by_commas) do
-      1 ->
+    case {length(split_by_commas), length(split_by_slashes)} do
+      {1, 1} ->
         true
 
-      2 ->
-        possible_suffix_or_hwy =
-          split_by_commas
-          |> List.first()
-          # Next line a little inefficient (since it will be repeated) but only happens if single comma exists in address
-          |> Standardizer.standardize_highways("")
-          |> String.split(" ")
-          |> List.last()
+      {2, 1} ->
+        is_possible_suffix_or_hwy_before_comma_or_slash?(split_by_commas)
 
-        if AddressUS.Parser.AddrLine.get_suffix_value(possible_suffix_or_hwy) ||
-             String.contains?(possible_suffix_or_hwy, "_"),
-           do: true,
-           else: false
+      {1, 2} ->
+        is_possible_suffix_or_hwy_before_comma_or_slash?(split_by_slashes)
 
       _more ->
         false
     end
+  end
+
+  defp is_possible_suffix_or_hwy_before_comma_or_slash?(split_address) do
+    possible_suffix_or_hwy =
+      split_address
+      |> List.first()
+      # Next line a little inefficient (since it will be repeated) but only happens if single comma exists in address
+      |> Standardizer.standardize_highways("")
+      |> String.split(" ")
+      |> List.last()
+
+    if AddressUS.Parser.AddrLine.get_suffix_value(possible_suffix_or_hwy) ||
+         String.contains?(possible_suffix_or_hwy, "_"),
+       do: true,
+       else: false
   end
 
   @doc """
@@ -350,14 +368,19 @@ defmodule AddressUS.Parser do
 
   @doc "Given a street struct will return a tuple of formatted strings for the addr and addr2"
   def addr_and_addr2_from_street(%Street{} = addr) do
+    {primary_number, secondary_value} =
+      if addr.secondary_value != nil and addr.secondary_designator == nil,
+        do: {addr.primary_number <> "-" <> addr.secondary_value, nil},
+        else: {addr.primary_number, addr.secondary_value}
+
     prim_line =
-      [addr.primary_number, addr.pre_direction, addr.name, addr.suffix, addr.post_direction]
+      [primary_number, addr.pre_direction, addr.name, addr.suffix, addr.post_direction]
       |> Enum.reject(&is_nil/1)
       |> Enum.join(" ")
       |> String.trim()
 
     sec_line =
-      [addr.pmb, addr.secondary_designator, addr.secondary_value, addr.additional_designation]
+      [addr.pmb, addr.secondary_designator, secondary_value, addr.additional_designation]
       |> Enum.reject(&is_nil/1)
       |> Enum.join(" ")
       |> String.trim()
@@ -369,13 +392,13 @@ defmodule AddressUS.Parser do
   ## Private Functions
   ############################################################################
 
-  defp parse_address_line_fmt(messy_address, state \\ "", casing \\ :title, opts \\ [])
+  def parse_address_line_fmt(messy_address, state \\ "", casing \\ :title, opts \\ [])
 
-  defp parse_address_line_fmt(messy_address, _state, _casing, _opts)
-       when not is_binary(messy_address),
-       do: nil
+  def parse_address_line_fmt(messy_address, _state, _casing, _opts)
+      when not is_binary(messy_address),
+      do: nil
 
-  defp parse_address_line_fmt(messy_address, state, casing, opts) do
+  def parse_address_line_fmt(messy_address, state, casing, opts) do
     fmt_opt = Keyword.get(opts, :additional, :newline)
 
     street = parse_address_line(messy_address, state, casing)

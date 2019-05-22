@@ -1914,4 +1914,31 @@ defmodule AddressUSTest do
   test "3N320 & 3N319 12TH ST" do
     assert clean_address_line("3N320 & 3N319 12TH ST") == "3N320 & 3N319 12TH ST"
   end
+
+  test "R R #1" do
+    assert clean_address_line("R R #1") == "RR 1"
+  end
+
+  # Test slash handling including an intersection.  If the slash is right after a suffix then likely the intersection is
+  # additional information after a good address and should be moved to the second line.
+  test "106 BROADWAY ST/US 231 & SR 50" do
+    assert clean_address_line("106 BROADWAY ST/US 231 & SR 50", "IN") ==
+             "106 BROADWAY ST\nUS HIGHWAY 231 & STATE ROAD 50"
+
+    assert clean_address_line("106 BROADWAY/US 231 & SR 50", "IN") ==
+             "106 BROADWAY/US HIGHWAY 231 & STATE ROAD 50"
+  end
+
+  test "C.R. 500 E AND 900 N" do
+    assert clean_address_line("C.R. 500 E AND 900 N") == "COUNTY ROAD 500 E & 900 N"
+  end
+
+  test "906A S PETERCHEFF ST" do
+    assert clean_address_line("906A S PETERCHEFF STREET") == "906-A S PETERCHEFF ST"
+    assert clean_address_line("906-A S PETERCHEFF STREET") == "906-A S PETERCHEFF ST"
+  end
+
+  test "906S WASHINGTON AVENUE" do
+    assert clean_address_line("906S WASHINGTON AVENUE") == "906 S WASHINGTON AVE"
+  end
 end
