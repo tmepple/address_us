@@ -77,6 +77,7 @@ defmodule AddressUS.Parser.Standardizer do
     # |> safe_replace(~r/(\S)\.\s/, "\\1. ")
     # remove periods that are not adjacent to digits
     |> safe_replace(~r/(?!\d)\.(?!\d)/, " ")
+    |> safe_replace("  ", " ")
     |> safe_replace(~r/POST OFFICE BOX/, "PO BOX")
     |> safe_replace(~r/P O BOX/, "PO BOX")
     # |> safe_replace(~r/P\.O\. BOX/, "PO BOX")

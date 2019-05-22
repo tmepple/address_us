@@ -252,7 +252,8 @@ defmodule AddressUS.Parser.AddrLine do
       number == nil && string_is_number_or_fraction?(head) ->
         log_term("get_number - 2")
         tail_head = safe_replace(tail_head, ~r/\(([A-Z0-9])\)/, "\\1")
-        alphanumeric = "ABCDFHIJLKMOPQRGTUVXYZ1234567890"
+        # Test for all alphanumerics except for directionals and "O" (i.e. 44 O HARA ST)
+        alphanumeric = "ABCDFGHIJKLMPQRTUVXYZ1234567890"
 
         case safe_contains?(alphanumeric, tail_head) do
           false ->
@@ -260,10 +261,21 @@ defmodule AddressUS.Parser.AddrLine do
 
           true ->
             # If the term after the number is a single alphanumeric then check to see if the term after that is
-            # a valid suffix (i.e. 4400 A Avenue) before assuming it's a secondary_value
-            if get_suffix_value(tail_tail_head),
-              do: get_number(tail, backup, head, box, p_val, p_des, true),
-              else: get_number(tail_tail, backup, head, box, tail_head, p_des, true)
+            # a valid suffix (i.e. 4400 A Avenue) or is it another single non-directional alphanumeric (then likely 3422 A J Green Ave)
+            # before assuming it's a secondary_value
+            case {get_suffix_value(tail_tail_head), safe_contains?(alphanumeric, tail_tail_head)} do
+              {val, _other} when not is_nil(val) ->
+                get_number(tail, backup, head, box, p_val, p_des, true)
+
+              {nil, true} ->
+                get_number(tail, backup, head, box, p_val, p_des, true)
+
+              _other ->
+                get_number(tail_tail, backup, head, box, tail_head, p_des, true)
+            end
+
+            # do: get_number(tail, backup, head, box, p_val, p_des, true),
+            # else: get_number(tail_tail, backup, head, box, tail_head, p_des, true)
         end
 
       # number == nil && string_is_number_or_fraction?(safe_replace(head, regex, "\\1")) ->
