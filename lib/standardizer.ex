@@ -74,6 +74,7 @@ defmodule AddressUS.Parser.Standardizer do
     # |> safe_replace(~r/\s\.\s/, ". ")
     # |> safe_replace(~r/\s\.(\S)/, ". \\1")
     # |> safe_replace(~r/(\S)\.\s/, "\\1. ")
+    |> safe_replace(~r/POST OFFICE BOX/, "PO BOX")
     |> safe_replace(~r/P O BOX/, "PO BOX")
     |> safe_replace(~r/P\.O\.BOX/, "PO BOX")
     |> safe_replace(~r/P\.O\. BOX/, "PO BOX")
@@ -81,7 +82,9 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/PO BOX(\d+)/, "PO BOX \\1")
     |> safe_replace(~r/POB (\d+)/, "PO BOX \\1")
     |> safe_replace(~r/[\/\-]PO BOX/, " PO BOX")
+    |> safe_replace(~r/^R\.R\. /, "RR ")
     |> safe_replace(~r/^R R /, "RR ")
+    |> safe_replace(~r/^(RTE|RT)\s?(\d+)\,?\s?BOX\s?(\d+)$/, "RR \\2 BOX \\3")
     |> safe_replace(~r/(RR|HC)\s?(\d+)\,\s?BOX\s?(\d+)/, "\\1 \\2 BOX \\3")
 
     # remove periods that are not adjacent to digits
