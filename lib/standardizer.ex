@@ -88,7 +88,7 @@ defmodule AddressUS.Parser.Standardizer do
     # |> safe_replace(~r/^R\.R\. /, "RR ")
     |> safe_replace(~r/^R\s?R\s?\#?/, "RR ")
     |> safe_replace(~r/^(RTE|RT|R)\s?\#?(\d+)\,?\s?BOX\s?(\d+)$/, "RR \\2 BOX \\3")
-    |> safe_replace(~r/(RR|HC)\s?(\d+)\,\s?BOX\s?(\d+)/, "\\1 \\2 BOX \\3")
+    |> safe_replace(~r/(RR|HC|RURAL ROUTE)\s?(\d+)\,\s?BOX\s?(\d+)/, "\\1 \\2 BOX \\3")
     |> safe_replace(~r/\s,\s/, ", ")
     |> safe_replace(~r/^(\d+) (THROUGH|THRU) (\d+)\s/, "\\1-\\3 ")
     |> safe_replace(~r/^(\d+) (\d+) (ST|ND|RD|TH)\s/, "\\1 \\2\\3 ")
@@ -135,12 +135,12 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\bSTATE (RD|ROAD) \#?(\d+)/, "STATE_ROAD_\\2")
     |> safe_replace(~r/\bSTATE (RT|RTE) \#?(\d+)/, "STATE_ROUTE_\\2")
     |> safe_replace(
-      ~r/\b(\d+|[NEWS\&]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD)[\s\(\/)]ST (RD|ROAD) \#?(\d+)/,
+      ~r/\b(\d+|[NEWS\&]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD|)[\s\/]?ST (RD|ROAD) \#?(\d+)/,
       "\\1 STATE_ROAD_\\3"
     )
     |> safe_replace(
-      ~r/\b(\d+|[NEWS\&]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD)[\s\(\/)]ST (RT|RTE) \#?(\d+)/,
-      "STATE_ROUTE_\\2"
+      ~r/\b(\d+|[NEWS\&]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD|)[\s\/]ST (RT|RTE) \#?(\d+)/,
+      "STATE_ROUTE_\\3"
     )
     |> safe_replace(~r/\b(RT|RTE|ROUTE) \#?(\d+)/, "ROUTE_\\2")
     # TODO: The digits and the directionals are only there if we standardize_highways at the beginning of the process not the way that standardize_address_list does it
@@ -152,6 +152,7 @@ defmodule AddressUS.Parser.Standardizer do
     # |> safe_replace(~r/(\d+) (N|E|S|W) (HWY|HIGHWAY) \#?(\d+)/, "\\1 \\2 HIGHWAY_\\4")
     # |> safe_replace(~r/\bS\s?R\ \#?(\d+)/, standardize_sr(state))
     |> safe_replace(~r/\bS\s?R\s?\#?(\d+)/, standardize_sr(state))
+    |> String.trim()
     |> standardize_bare_highways(input)
   end
 
