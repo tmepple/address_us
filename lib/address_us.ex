@@ -60,7 +60,7 @@ defmodule AddressUS.Parser do
     # NOTE: We don't standardize_highways here because it's done later as part of `parse_address_list`
     address =
       messy_address
-      |> String.upcase()
+      |> Standardizer.pre_standardize_address()
       |> Standardizer.standardize_intersections()
       |> Standardizer.standardize_address()
 
@@ -111,7 +111,7 @@ defmodule AddressUS.Parser do
 
   def parse_address_line(messy_address, state, casing) do
     messy_address
-    |> String.upcase()
+    |> Standardizer.pre_standardize_address()
     |> Standardizer.standardize_intersections()
     |> Standardizer.standardize_address()
     |> Standardizer.standardize_highways(state)
@@ -136,7 +136,7 @@ defmodule AddressUS.Parser do
 
   def standardize_address_line(messy_address, state, casing) do
     messy_address
-    |> String.upcase()
+    |> Standardizer.pre_standardize_address()
     |> Standardizer.standardize_intersections()
     |> Standardizer.standardize_address()
     |> Standardizer.standardize_highways(state)
@@ -156,11 +156,7 @@ defmodule AddressUS.Parser do
   def clean_address_line(messy_address, state, casing) do
     messy_address =
       messy_address
-      |> String.upcase()
-      # underscores and pipes are special characters in our future processing so ensure neither exists in the source address
-      |> String.replace(~r[\_\|], " ")
-      # In FRS the number is frequently scrunched up against the first word -- if it's 3 chars or more it's not a unit or directional
-      |> String.replace(~r/^(\d+)([A-Z]{3,})/, "\\1 \\2")
+      |> Standardizer.pre_standardize_address()
       |> Standardizer.postpend_prepended_po_box()
 
     valid_number? =

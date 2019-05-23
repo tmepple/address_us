@@ -53,7 +53,6 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/(.+)#/, "\\1 #")
     |> safe_replace(~r/\n/, ", ")
     |> safe_replace(~r/\t/, " ")
-    |> safe_replace(~r/[\_\|]/, " ")
     # Slashes could mean intersection or adding an additional designation to existing street name
     # Since it's ambiguous we need to retain them
     # |> safe_replace(~r/\/(\D)/, " \\1")
@@ -88,7 +87,7 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/[\/\-]PO BOX/, " PO BOX")
     # |> safe_replace(~r/^R\.R\. /, "RR ")
     |> safe_replace(~r/^R\s?R\s?\#?/, "RR ")
-    |> safe_replace(~r/^(RTE|RT)\s?(\d+)\,?\s?BOX\s?(\d+)$/, "RR \\2 BOX \\3")
+    |> safe_replace(~r/^(RTE|RT|R)\s?\#?(\d+)\,?\s?BOX\s?(\d+)$/, "RR \\2 BOX \\3")
     |> safe_replace(~r/(RR|HC)\s?(\d+)\,\s?BOX\s?(\d+)/, "\\1 \\2 BOX \\3")
     |> safe_replace(~r/\s,\s/, ", ")
     |> safe_replace(~r/^(\d+) (THROUGH|THRU) (\d+)\s/, "\\1-\\3 ")
@@ -98,8 +97,8 @@ defmodule AddressUS.Parser.Standardizer do
     # If the street number has a letter appended to it, seperate it with a space (if a directional) or a dash (if not)
     |> safe_replace(~r/^(\d+)((?![NEWSM])[A-Z])\s/, "\\1-\\2 ")
     |> safe_replace(~r/^(\d+)([NEWS])\s/, "\\1 \\2 ")
-    ## In FRS the number is frequently scrunched up against the first word -- if it's 3 chars or more it's not a unit or directional
-    |> safe_replace(~r/^(\d+)([A-Z]{3,})/, "\\1 \\2")
+    # Handle addresses without spaces such as "400N-300S"
+    |> safe_replace(~r/^(\d+)([NEWS])\-?(\d+)([NEWS])$/, "\\1 \\2 \\3 \\4")
     |> safe_replace("  ", " ")
     |> String.trim()
   end
@@ -135,8 +134,14 @@ defmodule AddressUS.Parser.Standardizer do
     # The prefix to ST|STATE avoids false positives like "MAIN ST RT 40"
     |> safe_replace(~r/\bSTATE (RD|ROAD) \#?(\d+)/, "STATE_ROAD_\\2")
     |> safe_replace(~r/\bSTATE (RT|RTE) \#?(\d+)/, "STATE_ROUTE_\\2")
-    |> safe_replace(~r/(^|\&\s)ST (RD|ROAD) \#?(\d+)/, "\\1STATE_ROAD_\\3")
-    |> safe_replace(~r/(^|\&\s)ST (RT|RTE) \#?(\d+)/, "\\1STATE_ROUTE_\\3")
+    |> safe_replace(
+      ~r/\b(\d+|[NEWS\&]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD)[\s\(\/)]ST (RD|ROAD) \#?(\d+)/,
+      "\\1 STATE_ROAD_\\3"
+    )
+    |> safe_replace(
+      ~r/\b(\d+|[NEWS\&]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD)[\s\(\/)]ST (RT|RTE) \#?(\d+)/,
+      "STATE_ROUTE_\\2"
+    )
     |> safe_replace(~r/\b(RT|RTE|ROUTE) \#?(\d+)/, "ROUTE_\\2")
     # TODO: The digits and the directionals are only there if we standardize_highways at the beginning of the process not the way that standardize_address_list does it
     # We can try doing standardize_highways at the beginning in those cases or we can make the digits optional in the regexes below.
@@ -179,6 +184,19 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\sAT\s/, " & ")
     |> safe_replace(~r/\@/, " & ")
     |> safe_replace(~r/^JCT\.? (OF )?(.+\&.+)/, "\\2")
+  end
+
+  def pre_standardize_address(messy_address) when not is_binary(messy_address), do: nil
+
+  def pre_standardize_address(messy_address) do
+    messy_address
+    |> String.upcase()
+    # underscores and pipes are special characters in our future processing so ensure neither exists in the source address
+    |> safe_replace(~r[\_\|], " ")
+    # In FRS the number is frequently scrunched up against the first word -- if it's 3 chars or more it's not a unit or directional
+    |> safe_replace(~r/^(\d+)([A-Z]{3,})/, "\\1 \\2")
+    # Handle 123-44TH ST
+    |> safe_replace(~r/^(\d+)\-(\d+(ST|ND|RD|TH))\s/, "\\1 \\2 ")
   end
 
   @doc """

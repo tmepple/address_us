@@ -1927,5 +1927,9 @@ defmodule AddressUSTest do
     # Don't capture a second number in an address like this as a secondary value set off with a dash
     assert clean_address_line("147 3 RD11 E OF EX 11") == "147 3 RD11 E OF EX 11"
     assert clean_address_line("102600GLOBE ROAD") == "102600 GLOBE RD"
+    assert clean_address_line("R #1 BOX 41") == "RR 1 BOX 41"
+    assert clean_address_line("300N-400W") == "300 N 400 W"
+    assert clean_address_line("647-23RD STREET") == "647 23RD ST"
+    assert clean_address_line("12531 LEO RD/ST RD 1") == "12531 LEO RD\nSTATE ROAD 1"
   end
 end
