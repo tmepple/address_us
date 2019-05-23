@@ -60,7 +60,7 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\"/, "")
     # Apostrophes or backticks against a number with a non-number afterwards usually refer to feet.  Otherwise remove them.
     |> safe_replace(~r/(\d+)[\'\`]\s(\D)/, "\\1 FT \\2")
-    |> safe_replace(~r/[\'\`]/, "")
+    |> safe_replace(~r/[\'\`\?\!]/, "")
     |> safe_replace(~r/\s+/, " ")
     |> safe_replace(~r/,(\S)/, ", \\1")
     |> safe_replace(~r/\s,(\S)/, ", \\1")
@@ -135,11 +135,11 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\bSTATE (RD|ROAD) \#?(\d+)/, "STATE_ROAD_\\2")
     |> safe_replace(~r/\bSTATE (RT|RTE) \#?(\d+)/, "STATE_ROUTE_\\2")
     |> safe_replace(
-      ~r/\b(\d+|[NEWS\&]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD|)[\s\/]?ST (RD|ROAD) \#?(\d+)/,
+      ~r/\b(\d+|[NEWS\&]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD|^)[\s\/]?ST (RD|ROAD) \#?(\d+)/,
       "\\1 STATE_ROAD_\\3"
     )
     |> safe_replace(
-      ~r/\b(\d+|[NEWS\&]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD|)[\s\/]ST (RT|RTE) \#?(\d+)/,
+      ~r/\b(\d+|[NEWS\&]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD|^)[\s\/]ST (RT|RTE) \#?(\d+)/,
       "STATE_ROUTE_\\3"
     )
     |> safe_replace(~r/\b(RT|RTE|ROUTE) \#?(\d+)/, "ROUTE_\\2")

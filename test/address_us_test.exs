@@ -1931,5 +1931,6 @@ defmodule AddressUSTest do
     assert clean_address_line("300N-400W") == "300 N 400 W"
     assert clean_address_line("647-23RD STREET") == "647 23RD ST"
     assert clean_address_line("12531 LEO RD/ST RD 1") == "12531 LEO RD\nSTATE ROAD 1"
+    assert clean_address_line("ADDRESS WITH ?? AND !!! AND ` AND '") == "ADDRESS WITH & & &"
   end
 end
