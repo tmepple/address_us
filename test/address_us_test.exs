@@ -1909,5 +1909,14 @@ defmodule AddressUSTest do
 
     assert clean_address_line("3304 E 82ND ST (E OF RAW MATL BL") ==
              "3304 E 82ND ST\nE OF RAW MATL BL"
+
+    assert clean_address_line("3415 LINCOLN WAY E √ù3415 LINCOLN WAY E") == "3415 LINCOLN WAY E"
+
+    assert clean_address_line("3419 CARNEGIE AVE (NE C/O DRIVE)") ==
+             "3419 CARNEGIE AVE\nNE C/O DRIVE"
+
+    assert clean_address_line("350 EAST 40TH STREET PO BX 68") == "350 E 40TH ST\nPO BOX 68"
+
+    assert clean_address_line("3704 COUNTRY RD 229") == "3704 COUNTRY ROAD 229"
   end
 end

@@ -24,6 +24,7 @@ defmodule AddressUS.Parser.Helpers do
     str
     |> safe_replace("^", " & ")
     |> safe_replace("_", " ")
+    |> safe_replace("|", "\n")
     |> title_case()
   end
 
@@ -31,6 +32,7 @@ defmodule AddressUS.Parser.Helpers do
     str
     |> safe_replace("^", " & ")
     |> safe_replace("_", " ")
+    |> safe_replace("|", "\n")
   end
 
   # Cleans up hyphenated street values by removing the hyphen and returing the
@@ -249,7 +251,7 @@ defmodule AddressUS.Parser.Helpers do
   end
 
   def log_term(term \\ nil, label) do
-    # Logger.debug(label <> ": " <> inspect(term))
+    Logger.debug(label <> ": " <> inspect(term))
     term
   end
 

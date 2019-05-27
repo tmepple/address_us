@@ -180,8 +180,6 @@ defmodule AddressUS.Parser do
     # is not pinned up against a suffix then it's too complex to attempt parsing so just standardize it.
     ret_val =
       if not valid_number? or not max_one_comma_slash_hugging_suffix_or_hwy?(messy_address) do
-        # TODO: send pre_std: false to each of these to keep pre_standardization from happening again
-        # TODO: Then fix the parse_address_line so it puts anything after a pipe to the additional designator
         standardize_address_line(messy_address, state, casing: casing, pre_std: false)
       else
         # standardize only the intersection & AND AT @ and split

@@ -9,8 +9,6 @@ defmodule AddressUS.Parser.Standardizer do
 
   def standardize_address(messy_address) do
     messy_address
-    # Remove any non-ASCII characters from address
-    |> safe_replace(~r/[^\x00-\x7F]/, "")
     |> safe_replace(~r/^\#\s?/, "")
     |> safe_replace(~r/ UNITED STATES$/, "")
     |> safe_replace(~r/ US$/, "")
@@ -34,8 +32,8 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\sET\sAL\s/, "")
     |> safe_replace(~r/\sIN\sCARE\sOF\s/, "")
     |> safe_replace(~r/\sCARE\sOF\s/, "")
-    # C/O is Care Of
-    |> safe_replace(~r/C\/O\s/, "")
+    # Commented since the meaning "care of" wasn't covered by tests and frequently also means "corner of" which we want to retain
+    # |> safe_replace(~r/C\/O\s/, "")
     |> safe_replace(~r/\sBY\sPASS\b/, " BYPASS ")
     |> safe_replace(~r/\sBY\s/, "")
     |> safe_replace(~r/\sFOR\s/, "")
@@ -85,6 +83,7 @@ defmodule AddressUS.Parser.Standardizer do
     # |> safe_replace(~r/P\.O\. BOX/, "PO BOX")
     # |> safe_replace(~r/P\.O\. BOX/, "PO BOX")
     # |> safe_replace(~r/P\. O\. BOX/, "PO BOX")
+    |> safe_replace(~r/PO BX (\d+)/, "PO BOX \\1")
     |> safe_replace(~r/PO BOX(\d+)/, "PO BOX \\1")
     |> safe_replace(~r/POB (\d+)/, "PO BOX \\1")
     |> safe_replace(~r/[\/\-]PO BOX/, " PO BOX")
@@ -152,6 +151,8 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\|ST (RD|ROAD) \#?(\d+)/, "|STATE_ROAD_\\2")
     |> safe_replace(~r/\|ST (RT|RTE|ROUTE) \#?(\d+)/, "|STATE_ROUTE_\\2")
     |> safe_replace(~r/\b(RT|RTE|ROUTE) \#?(\d+)/, "ROUTE_\\2")
+    |> safe_replace(~r/\b(ROAD|RD) \#?(\d+)/, "ROAD_\\2")
+
     # TODO: The digits and the directionals are only there if we standardize_highways at the beginning of the process not the way that standardize_address_list does it
     # We can try doing standardize_highways at the beginning in those cases or we can make the digits optional in the regexes below.
     # Or we can split out these four lines into new functions (with and without digits) and call them appropriately at the right time.
@@ -207,6 +208,8 @@ defmodule AddressUS.Parser.Standardizer do
     messy_address
     |> String.upcase()
     |> String.trim()
+    # Remove any non-ASCII characters from address
+    |> safe_replace(~r/[^\x00-\x7F]/, "")
     # underscores, pipes, and carets are special characters in our future processing so ensure none exists in the source address
     |> safe_replace(~r/[\_\|\^]/, " ")
     # In FRS the number is frequently scrunched up against the first word -- if it's 3 chars or more it's not a unit or directional
@@ -221,6 +224,22 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/^(.+)\(([^\)]+)$/, "\\1|\\2")
     # |> String.replace_suffix(")", "")
     |> safe_replace(~r/\s\|/, "|")
+    |> eliminate_repitition()
+  end
+
+  def eliminate_repitition(string) do
+    no_spaces = String.replace(string, " ", "")
+    len = String.length(no_spaces)
+
+    if no_spaces != string and Integer.mod(len, 2) == 0 do
+      if String.slice(no_spaces, 0..(div(len, 2) - 1)) == String.slice(no_spaces, div(len, 2)..-1) do
+        String.slice(string, 0..div(String.length(string) - 1, 2)) |> String.trim()
+      else
+        string
+      end
+    else
+      string
+    end
   end
 
   @doc """
