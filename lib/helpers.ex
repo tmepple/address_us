@@ -20,9 +20,18 @@ defmodule AddressUS.Parser.Helpers do
     |> String.trim()
   end
 
-  def apply_casing(str, :title), do: title_case(str)
+  def apply_casing_replace_pins(str, :title) do
+    str
+    |> safe_replace("^", " & ")
+    |> safe_replace("_", " ")
+    |> title_case()
+  end
 
-  def apply_casing(str, _), do: str
+  def apply_casing_replace_pins(str, _) do
+    str
+    |> safe_replace("^", " & ")
+    |> safe_replace("_", " ")
+  end
 
   # Cleans up hyphenated street values by removing the hyphen and returing the
   # values or the appropriate USPS abbreviations for said values in a list.
@@ -66,6 +75,10 @@ defmodule AddressUS.Parser.Helpers do
     full_address = address |> Enum.join(" ") |> safe_upcase
     !is_sec_unit_suffix_num_or_frac?(head) && String.match?(full_address, ~r/BOX\s/)
   end
+
+  def empty_str_to_nil(""), do: nil
+
+  def empty_str_to_nil(str), do: str
 
   def is_highway?(word) when not is_binary(word), do: false
 

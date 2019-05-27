@@ -1,8 +1,6 @@
 defmodule AddressUS.Parser.AddrLine do
   import AddressUS.Parser.Helpers
 
-  alias AddressUS.Parser.Standardizer
-
   # Parses an address list for all of the requisite address parts and returns
   # a Street struct.
   # p_val = possible secondary value
@@ -18,8 +16,12 @@ defmodule AddressUS.Parser.AddrLine do
       Enum.map(address, &safe_replace(&1, ",", ""))
       |> log_term("cleaned")
 
+    {additional, address_no_trailing_pipe} =
+      remove_trailing_pipe(cleaned_address)
+      |> log_term("removed_trailing_pipe")
+
     {additional, address_no_trailing_parens} =
-      get_trailing_parens(cleaned_address)
+      get_trailing_parens(address_no_trailing_pipe, additional)
       |> log_term("get_trailing_parens")
 
     {designator, value, pmb, additional, address_no_secondary} =
@@ -94,11 +96,9 @@ defmodule AddressUS.Parser.AddrLine do
     # 5875 CASTLE CREEK PKWY DR BLDG 4 STE 195 is a good test -- Bldg 4 should be removed to additional
     # and 1040 A AVE FREEMAN FIELD
     # and 9704 BEAUMONT RD MAINT BLDG
-    {final_name, additional, suffix} =
-      strip_additional_and_suffix_from_name(final_name, additional, suffix)
-      |> log_term("final_name, addtl, suffix after stripping")
-
-    # final_name = standardize_highways(final_name, state)
+    {final_name, additional, suffix, post_direction} =
+      strip_additional_and_suffix_from_name(final_name, additional, suffix, post_direction)
+      |> log_term("final_name, addtl, suffix, postdirection after stripping")
 
     suffix = if suffix == "*", do: nil, else: suffix
 
@@ -131,16 +131,27 @@ defmodule AddressUS.Parser.AddrLine do
     log_term(final_secondary_value, "final_secondary_value")
 
     %Street{
-      secondary_designator: apply_casing(final_secondary_designator, casing),
+      secondary_designator: apply_casing_replace_pins(final_secondary_designator, casing),
       post_direction: post_direction,
       pre_direction: pre_direction,
-      secondary_value: apply_casing(final_secondary_value, casing),
-      pmb: apply_casing(pmb, casing),
-      suffix: apply_casing(suffix, casing),
+      secondary_value: apply_casing_replace_pins(final_secondary_value, casing),
+      pmb: apply_casing_replace_pins(pmb, casing),
+      suffix: apply_casing_replace_pins(suffix, casing),
       primary_number: primary_number,
-      name: apply_casing(final_name, casing),
-      additional_designation: apply_casing(additional, casing)
+      name: apply_casing_replace_pins(final_name, casing),
+      additional_designation: apply_casing_replace_pins(additional, casing)
     }
+  end
+
+  # TEMPORARY LOCATION FOR NEW PRIVATE FUNCTIONS
+
+  defp remove_trailing_pipe(address_list) do
+    addr = Enum.reverse(address_list) |> Enum.join(" ")
+    split = String.split(addr, "|", max_parts: 2)
+
+    if length(split) == 2,
+      do: {List.last(split), String.split(List.first(split), " ") |> Enum.reverse()},
+      else: {nil, address_list}
   end
 
   # PRIVATE FUNCTIONS (Alphabetical Order)
@@ -873,16 +884,19 @@ defmodule AddressUS.Parser.AddrLine do
 
   # Parses any trailing parenthesis out of the address list and returns
   # {additional designation in parenthesis, leftover_address_list}
-  defp get_trailing_parens(address) when not is_list(address), do: {nil, nil}
-  defp get_trailing_parens([]), do: {nil, nil}
-  defp get_trailing_parens(address), do: get_trailing_parens(address, address, nil, false)
-  defp get_trailing_parens([], backup, _city, false), do: {nil, backup}
+  defp get_trailing_parens(address, additional) when not is_list(address), do: {additional, nil}
+  defp get_trailing_parens([], _addtl), do: {nil, nil}
 
-  defp get_trailing_parens(address, _backup, nil, true) do
-    {nil, address}
+  defp get_trailing_parens(address, additional),
+    do: get_trailing_parens(address, address, nil, additional, false)
+
+  defp get_trailing_parens([], backup, _city, additional, false), do: {additional, backup}
+
+  defp get_trailing_parens(address, _backup, nil, additional, true) do
+    {additional, address}
   end
 
-  defp get_trailing_parens(address, backup, trailing_paren, true) do
+  defp get_trailing_parens(address, backup, trailing_paren, additional, true) do
     # Detect if trailing_paren is really a secondary designator/value.  If so then abort.
     # Also remove any remaining parens in the output
     units = AddressUSConfig.secondary_units()
@@ -890,30 +904,31 @@ defmodule AddressUS.Parser.AddrLine do
     head = String.split(trailing_paren, " ") |> List.first()
 
     if String.first(head) == "#" or Enum.member?(all_unit_values, head) do
-      {nil, Enum.map(backup, fn x -> String.replace(x, ~r/(\(|\))/, "") end)}
+      {additional, Enum.map(backup, fn x -> String.replace(x, ~r/(\(|\))/, "") end)}
     else
-      {trailing_paren, Enum.map(address, fn x -> String.replace(x, ~r/(\(|\))/, "") end)}
+      {append_string_with_space(additional, trailing_paren),
+       Enum.map(address, fn x -> String.replace(x, ~r/(\(|\))/, "") end)}
     end
   end
 
   # First run-through
-  defp get_trailing_parens(address, backup, nil, false) do
+  defp get_trailing_parens(address, backup, nil, additional, false) do
     # addr_str = Enum.reverse(address) |> Enum.join(" ")
     [head | tail] = address
 
     case {String.first(head), String.last(head), String.length(head)} do
       {"(", ")", len} when len > 2 ->
-        get_trailing_parens(tail, backup, String.slice(head, 1..-2), true)
+        get_trailing_parens(tail, backup, String.slice(head, 1..-2), additional, true)
 
       {_any, ")", _len} ->
-        get_trailing_parens(tail, backup, String.slice(head, 0..-2), false)
+        get_trailing_parens(tail, backup, String.slice(head, 0..-2), additional, false)
 
       _ ->
-        get_trailing_parens(address, backup, nil, true)
+        get_trailing_parens(address, backup, nil, additional, true)
     end
   end
 
-  defp get_trailing_parens(address, backup, trailing_paren, false) do
+  defp get_trailing_parens(address, backup, trailing_paren, additional, false) do
     [head | tail] = address
 
     case String.first(head) do
@@ -923,12 +938,13 @@ defmodule AddressUS.Parser.AddrLine do
           tail,
           backup,
           String.replace_leading(head, "(", "") <> " " <> trailing_paren,
+          additional,
           true
         )
 
       # Add word to accumulator and continue
       _ ->
-        get_trailing_parens(tail, backup, head <> " " <> trailing_paren, false)
+        get_trailing_parens(tail, backup, head <> " " <> trailing_paren, additional, false)
     end
   end
 
@@ -947,19 +963,19 @@ defmodule AddressUS.Parser.AddrLine do
 
   # Additional designations and suffixes could be present in the final processed street name
   # This function isn't intended to solve all of these cases but common ones are covered
-  defp strip_additional_and_suffix_from_name(street_name, additional, suffix) do
-    {st, ad, su} =
-      {street_name, additional, suffix}
-      # |> safe_replace_first_elem(~r/\#/, "")
-      |> strip_regex_to_additional(~r/( |\-)PO BOX \w+$/i)
-      |> strip_regex_to_additional(~r/( |\-)BOX \w+$/i)
-      |> strip_regex_to_additional(~r/( |\-)MILEPOST (\w|\.)+$/i)
-      |> strip_embedded_suffix()
+  defp strip_additional_and_suffix_from_name(street_name, additional, suffix, post_directional) do
+    # {st, ad, su} =
+    {street_name, additional, suffix, post_directional}
+    # |> safe_replace_first_elem(~r/\#/, "")
+    |> strip_regex_to_additional(~r/( |\-)PO BOX \w+$/i)
+    |> strip_regex_to_additional(~r/( |\-)BOX \w+$/i)
+    |> strip_regex_to_additional(~r/( |\-)MILEPOST (\w|\.)+$/i)
+    |> strip_embedded_suffix()
 
-    {safe_replace(st, "_", " "), safe_replace(ad, "_", " "), su}
+    # {st, ad, su}
   end
 
-  def strip_embedded_suffix({street_name, additional, nil} = tuple)
+  def strip_embedded_suffix({street_name, additional, nil, nil} = tuple)
       when not is_nil(street_name) do
     # Checking if the string contains a suffix string before going through the expensive operation
     if String.contains?(street_name, AddressUSConfig.common_suffix_keys()) do
@@ -982,13 +998,22 @@ defmodule AddressUS.Parser.AddrLine do
           last_suffix_index = length(street_list) - 1 - rev_last_suffix_index
           ret_street = Enum.take(street_list, last_suffix_index) |> Enum.join(" ")
           ret_suffix = get_suffix_value(Enum.at(street_list, last_suffix_index))
+          term_after_suffix = Enum.at(street_list, last_suffix_index + 1)
+
+          ret_postdirectional =
+            if term_after_suffix,
+              do: get_direction_value(term_after_suffix) |> empty_str_to_nil(),
+              else: nil
+
+          addtl_start_index =
+            if ret_postdirectional, do: last_suffix_index + 2, else: last_suffix_index + 1
 
           new_addtl =
-            Enum.take(street_list, (length(street_list) - (last_suffix_index + 1)) * -1)
+            Enum.take(street_list, (length(street_list) - addtl_start_index) * -1)
             |> Enum.join(" ")
 
           ret_addtl = append_string_with_space(additional, new_addtl)
-          {ret_street, ret_addtl, ret_suffix}
+          {ret_street, ret_addtl, ret_suffix, ret_postdirectional}
       end
     else
       tuple
@@ -1011,15 +1036,18 @@ defmodule AddressUS.Parser.AddrLine do
     end
   end
 
-  defp strip_regex_to_additional({nil, _, _} = tuple, _regex), do: tuple
+  defp strip_regex_to_additional({nil, _, _, _} = tuple, _regex), do: tuple
 
-  defp strip_regex_to_additional({street_name, additional, suffix} = tuple, regex) do
+  defp strip_regex_to_additional(
+         {street_name, additional, suffix, post_directional} = tuple,
+         regex
+       ) do
     parts = Regex.split(regex, street_name, include_captures: true)
 
     if length(parts) == 1 do
       tuple
     else
-      {List.first(parts), append_string(additional, Enum.at(parts, 1)), suffix}
+      {List.first(parts), append_string(additional, Enum.at(parts, 1)), suffix, post_directional}
     end
   end
 

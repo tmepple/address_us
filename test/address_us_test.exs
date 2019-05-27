@@ -607,7 +607,7 @@ defmodule AddressUSTest do
     assert desired_result == result
   end
 
-  # I think this should be parsed as "W" street not West street (i.e. W Street, Lincoln, NE and W Street NW, Washington, DC are real streets)
+  # NOTE: I think this should be parsed as "W" street not West street (i.e. W Street, Lincoln, NE and W Street NW, Washington, DC are real streets)
   # test "Parse address: 804 & 806 W Street, Watertown, North Dakota" do
   #   desired_result = %Address{
   #     city: "Watertown",
@@ -1748,22 +1748,6 @@ defmodule AddressUSTest do
     assert clean_address_line("400 E MAIN ST RT #40") == "400 E MAIN ST\nROUTE 40"
   end
 
-  # With the embedded slash since this could be a intersection it's only standardized not parsed.
-  test "127 WEST JASPER ST/US HWY 24 W" do
-    assert clean_address_line("127 WEST JASPER ST/US HWY 24 W") ==
-             "127 W JASPER ST\nUS HIGHWAY 24 W"
-  end
-
-  test "2128 MOUNDS ROAD & STATE ROAD 109" do
-    assert clean_address_line("2128 MOUNDS ROAD & SR 109", "IN") ==
-             "2128 MOUNDS RD & STATE ROAD 109"
-  end
-
-  # Prepended PO Box handling
-  test "PO Box 423 - 18 West Main Street" do
-    assert clean_address_line("PO Box 423 -  18 West Main Street") == "18 W MAIN ST\nPO BOX 423"
-  end
-
   test "1400 OLD HWY. 69 S., Cambridge City, IN" do
     desired_result = %Address{
       city: "Cambridge City",
@@ -1798,22 +1782,6 @@ defmodule AddressUSTest do
     assert desired_result == parse_address("W146 N9300 Held Drive, Menomonee Falls, WI  53051")
   end
 
-  test "149  W.CRAWFORD AVE" do
-    assert clean_address_line("149  W.CRAWFORD AVENUE") == "149 W CRAWFORD AVE"
-  end
-
-  test "2561 - 190TH STREET" do
-    assert clean_address_line("2561 - 190TH STREET") == "2561 190TH ST"
-  end
-
-  test "2021-1/2 E 4th Street" do
-    assert clean_address_line("2012-1/2 E 4th Street") == "2012 1/2 E 4TH ST"
-  end
-
-  test "RR 1, BOX 241" do
-    assert clean_address_line("RR 1, BOX 241") == "RR 1 BOX 241"
-  end
-
   test "W5871 COUNTY HWY VV, SHELDON, WI  54766" do
     desired_result = %Address{
       city: "Sheldon",
@@ -1828,23 +1796,6 @@ defmodule AddressUSTest do
     assert desired_result == parse_address("W5871 COUNTY HWY VV, SHELDON, WI  54766")
   end
 
-  test "544 UNITED STATES HIGHWAY 31 N" do
-    assert clean_address_line("544 UNITED STATES HIGHWAY 31 N") == "544 US HIGHWAY 31 N"
-  end
-
-  test "2500 N. ST. MARY'S" do
-    assert clean_address_line("2500 N. ST. MARY'S") == "2500 N ST MARYS"
-  end
-
-  test "500' W OF TEMPLE ON SR 104" do
-    assert clean_address_line("500' W OF TEMPLE ON SR 104") ==
-             "500 FT W OF TEMPLE ON STATE ROUTE 104"
-  end
-
-  test "150 Ho'okele St, Kahului, HI 96732" do
-    assert clean_address_line("150 Ho'okele St") == "150 HOOKELE ST"
-  end
-
   test "W5871 COUNTY HWY VV WAUSAU WI" do
     desired_result = %Address{
       city: "Wausau",
@@ -1856,20 +1807,6 @@ defmodule AddressUSTest do
     }
 
     assert desired_result == parse_address("W5871 COUNTY HWY VV WAUSAU WI")
-  end
-
-  test "11300 - 88TH AVENUE" do
-    assert clean_address_line("11300 - 88TH AVENUE") == "11300 88TH AVE"
-  end
-
-  # Ensure single commas hugging suffixes properly remove to additional designation
-  test "81 MORRIS ROAD, HIGHWAY 51 SOUTH" do
-    assert clean_address_line("81 MORRIS ROAD, HIGHWAY 51 SOUTH") ==
-             "81 MORRIS RD\nHIGHWAY 51 SOUTH"
-  end
-
-  test "81 SR 55, MAIN ST" do
-    assert clean_address_line("81 SR 55, MAIN ST") == "81 STATE ROUTE 55\nMAIN ST"
   end
 
   test "6281 M 22, Glen Arbor, MI" do
@@ -1886,23 +1823,44 @@ defmodule AddressUSTest do
   end
 
   test "Clean address lines" do
+    # With the embedded slash since this could be a intersection it's only standardized not parsed.
+    assert clean_address_line("127 WEST JASPER ST/US HWY 24 W") ==
+             "127 W JASPER ST\nUS HIGHWAY 24 W"
+
+    assert clean_address_line("2128 MOUNDS ROAD & SR 109", "IN") ==
+             "2128 MOUNDS RD & STATE ROAD 109"
+
+    # Prepended PO Box handling
+    assert clean_address_line("PO Box 423 -  18 West Main Street") == "18 W MAIN ST\nPO BOX 423"
+    assert clean_address_line("149  W.CRAWFORD AVENUE") == "149 W CRAWFORD AVE"
+    assert clean_address_line("2561 - 190TH STREET") == "2561 190TH ST"
+    assert clean_address_line("2012-1/2 E 4th Street") == "2012 1/2 E 4TH ST"
+    assert clean_address_line("RR 1, BOX 241") == "RR 1 BOX 241"
+    assert clean_address_line("544 UNITED STATES HIGHWAY 31 N") == "544 US HIGHWAY 31 N"
+    assert clean_address_line("2500 N. ST. MARY'S") == "2500 N ST MARYS"
+
+    assert clean_address_line("500' W OF TEMPLE ON SR 104") ==
+             "500 FT W OF TEMPLE ON STATE ROUTE 104"
+
+    assert clean_address_line("150 Ho'okele St") == "150 HOOKELE ST"
+    assert clean_address_line("11300 - 88TH AVENUE") == "11300 88TH AVE"
+    # Ensure single commas hugging suffixes properly remove to additional designation
+    assert clean_address_line("81 MORRIS ROAD, HIGHWAY 51 SOUTH") ==
+             "81 MORRIS RD\nHIGHWAY 51 SOUTH"
+
+    assert clean_address_line("81 SR 55, MAIN ST") == "81 STATE ROUTE 55\nMAIN ST"
     assert clean_address_line("8422 AR HWY 89 SOUTH") == "8422 AR HIGHWAY 89 S"
-
     assert clean_address_line("420 THRU 429 MAIN STREET") == "420-429 MAIN ST"
-
     # Directionals like 506 S. 1ST S.E.
     assert clean_address_line("506 S. 1ST S.E.") == "506 S 1ST SE"
     assert clean_address_line("716 N.E. HWY 66") == "716 NE HIGHWAY 66"
-
     assert clean_address_line("3421 8 Mile Road") == "3421 8 MILE RD"
 
     assert clean_address_line("8101 MOUNT HOLLY ROAD/HIGHWAY 27") ==
              "8101 MOUNT HOLLY RD\nHIGHWAY 27"
 
     assert clean_address_line("86 12 TH STREET") == "86 12TH ST"
-
     assert clean_address_line("3N320 & 3N319 12TH ST") == "3N320 & 3N319 12TH ST"
-
     assert clean_address_line("R R #1") == "RR 1"
 
     # Test slash handling including an intersection.  If the slash is right after a suffix then likely the intersection is
@@ -1914,14 +1872,10 @@ defmodule AddressUSTest do
              "106 BROADWAY/US HIGHWAY 231 & STATE ROAD 50"
 
     assert clean_address_line("C.R. 500 E AND 900 N") == "COUNTY ROAD 500 E & 900 N"
-
     assert clean_address_line("906A S PETERCHEFF STREET") == "906-A S PETERCHEFF ST"
     assert clean_address_line("906-A S PETERCHEFF STREET") == "906-A S PETERCHEFF ST"
-
     assert clean_address_line("906S WASHINGTON AVENUE") == "906 S WASHINGTON AVE"
-
     assert clean_address_line("1M S OF HWY 44") == "1M S OF HIGHWAY 44"
-
     assert clean_address_line("22423 I H 45") == "22423 INTERSTATE 45"
 
     # Don't capture a second number in an address like this as a secondary value set off with a dash
@@ -1932,5 +1886,25 @@ defmodule AddressUSTest do
     assert clean_address_line("647-23RD STREET") == "647 23RD ST"
     assert clean_address_line("12531 LEO RD/ST RD 1") == "12531 LEO RD\nSTATE ROAD 1"
     assert clean_address_line("ADDRESS WITH ?? AND !!! AND ` AND '") == "ADDRESS WITH & & &"
+    assert clean_address_line("4880 ST RT 38 NE") == "4880 STATE ROUTE 38 NE"
+    assert clean_address_line("3203 ST RT 113") == "3203 STATE ROUTE 113"
+    assert clean_address_line("9675 C.H.&D. RD") == "9675 C H & D RD"
+
+    assert clean_address_line("14 W PIKE (ST RT 55 @ GRANT)") ==
+             "14 W PIKE\nSTATE ROUTE 55 & GRANT"
+
+    assert clean_address_line("1320 S MAIN ST √ùST RT 46 & SALT RD") ==
+             "1320 S MAIN ST & SALT RD\nSTATE ROUTE 46"
+
+    assert clean_address_line("1014 S US 222 SUITE B & C") == "1014 S US HIGHWAY 222\nSTE B & C"
+
+    assert clean_address_line("1361 CHARDON RD ADJ BLDG 1 & 2") ==
+             "1361 CHARDON RD\nADJ BLDG 1 & 2"
+
+    assert clean_address_line("310 2ND ST (SR 5 & SR 46)") ==
+             "310 2ND ST\nSTATE ROUTE 5 & STATE ROUTE 46"
+
+    assert clean_address_line("3151 LINCOLN WAY W PO DRAWER C") ==
+             "3151 LINCOLN WAY W\nPO DRAWER C"
   end
 end

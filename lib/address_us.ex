@@ -52,15 +52,17 @@ defmodule AddressUS.Parser do
   import AddressUS.Parser.Helpers
   alias AddressUS.Parser.{AddrLine, Standardizer, CSZ}
 
-  def parse_address(messy_address, casing \\ :title)
+  def parse_address(messy_address, opts \\ [])
 
-  def parse_address(messy_address, _casing) when not is_binary(messy_address), do: nil
+  def parse_address(messy_address, _opts) when not is_binary(messy_address), do: nil
 
-  def parse_address(messy_address, casing) do
-    # NOTE: We don't standardize_highways here because it's done later as part of `parse_address_list`
+  def parse_address(messy_address, opts) do
+    casing = Keyword.get(opts, :casing, :title)
+    pre_std = Keyword.get(opts, :pre_std, true)
+
     address =
       messy_address
-      |> Standardizer.pre_standardize_address()
+      |> Standardizer.pre_standardize_address(pre_std)
       |> Standardizer.standardize_intersections()
       |> Standardizer.standardize_address()
 
@@ -89,7 +91,7 @@ defmodule AddressUS.Parser do
       postal: postal,
       plus_4: plus_4,
       state: state,
-      city: apply_casing(city, casing),
+      city: apply_casing_replace_pins(city, casing),
       street: street
     }
   end
@@ -104,21 +106,24 @@ defmodule AddressUS.Parser do
       suffix: "St"}
   """
 
-  def parse_address_line(messy_address, state \\ "", casing \\ :title)
+  def parse_address_line(messy_address, state \\ "", opts \\ [])
 
-  def parse_address_line(messy_address, _state, _casing) when not is_binary(messy_address),
+  def parse_address_line(messy_address, _state, _opts) when not is_binary(messy_address),
     do: nil
 
-  def parse_address_line(messy_address, state, casing) do
+  def parse_address_line(messy_address, state, opts) do
+    casing = Keyword.get(opts, :casing, :title)
+    pre_std = Keyword.get(opts, :pre_std, true)
+
     messy_address
-    |> Standardizer.pre_standardize_address()
+    |> Standardizer.pre_standardize_address(pre_std)
     |> Standardizer.standardize_intersections()
     |> Standardizer.standardize_address()
     |> Standardizer.standardize_highways(state)
     # Text following a single comma hugging a suffix (ie 12 MAIN ST, HIGHWAY 31 S) is likely additional information which
-    # causes issues when parsed (i.e. 12 MAIN ST S) so we should parenthesize it here so when it gets parsed it is properly
+    # causes issues when parsed (i.e. 12 MAIN ST S) so we should pipe delimit it here so when it gets parsed it is properly
     # called an "additional designation"
-    |> Standardizer.parenthesize_single_comma_hugging_suffix()
+    |> Standardizer.pipe_single_comma_hugging_suffix()
     |> log_term("std addr")
     |> String.split(" ")
     |> Enum.reverse()
@@ -129,19 +134,23 @@ defmodule AddressUS.Parser do
   Standardizes the raw street portion of an address according to USPS suggestions for
   address parsing.  If given a state will apply custom standardizations (if they exist) for that state 
   """
-  def standardize_address_line(messy_address, state \\ "", casing \\ :title)
+  def standardize_address_line(messy_address, state \\ "", opts \\ [])
 
-  def standardize_address_line(messy_address, _state, _casing) when not is_binary(messy_address),
+  def standardize_address_line(messy_address, _state, _opts) when not is_binary(messy_address),
     do: nil
 
-  def standardize_address_line(messy_address, state, casing) do
+  def standardize_address_line(messy_address, state, opts) do
+    casing = Keyword.get(opts, :casing, :title)
+    pre_std = Keyword.get(opts, :pre_std, true)
+
     messy_address
-    |> Standardizer.pre_standardize_address()
+    |> Standardizer.pre_standardize_address(pre_std)
     |> Standardizer.standardize_intersections()
     |> Standardizer.standardize_address()
     |> Standardizer.standardize_highways(state)
-    |> safe_replace("_", " ")
-    |> apply_casing(casing)
+    # |> safe_replace("_", " ")
+    # |> safe_replace("^", " & ")
+    |> apply_casing_replace_pins(casing)
   end
 
   @doc """
@@ -149,14 +158,16 @@ defmodule AddressUS.Parser do
   or if an intersection is given it will only standardize the address, otherwise it will first parse
   the address to standardize directionals, suffixes, and separate additional information.
   """
-  def clean_address_line(messy_address, state \\ "", casing \\ :upper)
+  def clean_address_line(messy_address, state \\ "", opts \\ [])
 
-  def clean_address_line(messy_address, _state, _casing) when not is_binary(messy_address), do: ""
+  def clean_address_line(messy_address, _state, _opts) when not is_binary(messy_address), do: ""
 
-  def clean_address_line(messy_address, state, casing) do
+  def clean_address_line(messy_address, state, opts) do
+    casing = Keyword.get(opts, :casing, :upper)
+
     messy_address =
       messy_address
-      |> Standardizer.pre_standardize_address()
+      |> Standardizer.pre_standardize_address(true)
       |> Standardizer.postpend_prepended_po_box()
 
     valid_number? =
@@ -169,45 +180,59 @@ defmodule AddressUS.Parser do
     # is not pinned up against a suffix then it's too complex to attempt parsing so just standardize it.
     ret_val =
       if not valid_number? or not max_one_comma_slash_hugging_suffix_or_hwy?(messy_address) do
-        standardize_address_line(messy_address, state, casing)
+        # TODO: send pre_std: false to each of these to keep pre_standardization from happening again
+        # TODO: Then fix the parse_address_line so it puts anything after a pipe to the additional designator
+        standardize_address_line(messy_address, state, casing: casing, pre_std: false)
       else
         # standardize only the intersection & AND AT @ and split
         split_address =
-          Standardizer.standardize_intersections(messy_address) |> String.split(" & ", parts: 2)
+          Standardizer.standardize_intersections(messy_address) |> String.split("&", parts: 2)
 
-        # if no & is found (thus it's not an intersection) then just parse it
-        if length(split_address) == 1 do
-          parse_address_line_fmt(messy_address, state, casing)
+        # if no & is found (thus it's not an intersection) or if the intersection happens after a pipe (thus belongs in the second line)
+        # then just parse it
+        if length(split_address) == 1 or String.contains?(List.first(split_address), "|") do
+          parse_address_line_fmt(messy_address, state, casing: casing, pre_std: false)
         else
+          # We have an ampersand so may have an intersection
           # if there's a slash in the first item that's not a fraction then check to see if it's hugging a suffix or highway
           # if so then the intersection is additional information and is put in line 2.  If not then we should just standardize
           # as there is too much ambiguity. 
           if Regex.match?(~r/(\D\/|\/\D)/, List.first(split_address)) do
             if max_one_comma_slash_hugging_suffix_or_hwy?(List.first(split_address)) do
-              parse_address_line_fmt(messy_address, state, casing)
+              parse_address_line_fmt(messy_address, state, casing: casing, pre_std: false)
             else
-              standardize_address_line(messy_address, state, casing)
+              standardize_address_line(messy_address, state, casing: casing, pre_std: false)
             end
           else
             # run first portion through parse_address_line_fmt and second portion through standardize then recombine with " & "
             split_line =
-              parse_address_line_fmt(List.first(split_address), state, casing)
+              parse_address_line_fmt(List.first(split_address), state,
+                casing: casing,
+                pre_std: false
+              )
               |> String.split("\n", parts: 2)
 
             if length(split_line) == 1 do
               List.first(split_line) <>
-                " & " <> standardize_address_line(List.last(split_address), state, casing)
+                " & " <>
+                standardize_address_line(List.last(split_address), state,
+                  casing: casing,
+                  pre_std: false
+                )
             else
               List.first(split_line) <>
                 " & " <>
-                standardize_address_line(List.last(split_address), state, casing) <>
+                standardize_address_line(List.last(split_address), state,
+                  casing: casing,
+                  pre_std: false
+                ) <>
                 "\n" <> List.last(split_line)
             end
           end
         end
       end
 
-    apply_casing(ret_val, casing)
+    apply_casing_replace_pins(ret_val, casing)
   end
 
   def max_one_comma_slash_hugging_suffix_or_hwy?(addr) do
@@ -390,8 +415,9 @@ defmodule AddressUS.Parser do
       |> Enum.join(" ")
       |> String.trim()
 
+    # [addr.pmb, addr.secondary_designator, secondary_value, addr.additional_designation]
     sec_line =
-      [addr.pmb, addr.secondary_designator, secondary_value, addr.additional_designation]
+      [addr.pmb, addr.additional_designation, addr.secondary_designator, secondary_value]
       |> Enum.reject(&is_nil/1)
       |> Enum.join(" ")
       |> String.trim()
@@ -403,16 +429,18 @@ defmodule AddressUS.Parser do
   ## Private Functions
   ############################################################################
 
-  def parse_address_line_fmt(messy_address, state \\ "", casing \\ :title, opts \\ [])
+  def parse_address_line_fmt(messy_address, state \\ "", opts \\ [])
 
-  def parse_address_line_fmt(messy_address, _state, _casing, _opts)
+  def parse_address_line_fmt(messy_address, _state, _opts)
       when not is_binary(messy_address),
       do: nil
 
-  def parse_address_line_fmt(messy_address, state, casing, opts) do
+  def parse_address_line_fmt(messy_address, state, opts) do
     fmt_opt = Keyword.get(opts, :additional, :newline)
+    casing = Keyword.get(opts, :casing, :title)
+    pre_std = Keyword.get(opts, :pre_std, true)
 
-    street = parse_address_line(messy_address, state, casing)
+    street = parse_address_line(messy_address, state, casing: casing, pre_std: pre_std)
 
     {prim_line, sec_line} = addr_and_addr2_from_street(street)
 

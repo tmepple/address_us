@@ -9,7 +9,8 @@ defmodule AddressUS.Parser.Standardizer do
 
   def standardize_address(messy_address) do
     messy_address
-    # |> safe_replace(~r/ United STATEs$/, "")
+    # Remove any non-ASCII characters from address
+    |> safe_replace(~r/[^\x00-\x7F]/, "")
     |> safe_replace(~r/^\#\s?/, "")
     |> safe_replace(~r/ UNITED STATES$/, "")
     |> safe_replace(~r/ US$/, "")
@@ -25,6 +26,8 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/^\((.+)\)$/, "\\1")
     |> safe_replace(~r/(.+)\(/, "\\1 (")
     |> safe_replace(~r/\)(.+)/, ") \\1")
+    |> safe_replace(~r/(.+)\&/, "\\1 &")
+    |> safe_replace(~r/\&(.+)/, "& \\1")
     # NOTE: Don't remove parenthesis yet
     # |> safe_replace(~r/\((.+)\)/, "\\1")
     |> safe_replace(~r/\sI.E.\s/, "")
@@ -39,7 +42,7 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\sALSO\s/, "")
     |> safe_replace(~r/\sATTENTION\s/, "")
     |> safe_replace(~r/\sATTN\s/, "")
-    # TODO: IS THE FOLLOWING LINE NEEDED?  NOT UNDERSTANDING IT
+    # Following line is commented out as not sure the purpose -- no existing tests target it
     # |> safe_replace(~r/\ss#\ss(\S)/, " #\\1")
     # # |> safe_replace(~r/(?i)P O BOX/, "PO BOX")
     # |> safe_replace(~r/\bUS (\d+)/, "US HIGHWAY \\1")
@@ -134,14 +137,20 @@ defmodule AddressUS.Parser.Standardizer do
     # The prefix to ST|STATE avoids false positives like "MAIN ST RT 40"
     |> safe_replace(~r/\bSTATE (RD|ROAD) \#?(\d+)/, "STATE_ROAD_\\2")
     |> safe_replace(~r/\bSTATE (RT|RTE) \#?(\d+)/, "STATE_ROUTE_\\2")
+    # The next two replacements are more complex to avoid false positives like 40 E MAIN ST RTE 4
     |> safe_replace(
-      ~r/\b(\d+|[NEWS\&]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD|^)[\s\/]?ST (RD|ROAD) \#?(\d+)/,
-      "\\1 STATE_ROAD_\\3"
+      ~r/(^|\s)(\d+|[NEWS\&\(]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD|^)(\s)?\/?ST (RD|ROAD) \#?(\d+)/,
+      "\\1\\2\\3 STATE_ROAD_\\5"
     )
     |> safe_replace(
-      ~r/\b(\d+|[NEWS\&]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD|^)[\s\/]ST (RT|RTE) \#?(\d+)/,
-      "STATE_ROUTE_\\3"
+      ~r/(^|\s)(\d+|[NEWS\&\(]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD|^)(\s)?\/?ST (RT|RTE|ROUTE) \#?(\d+)/,
+      "\\1\\2\\3 STATE_ROUTE_\\5"
     )
+    # The next two replacements clean up from the above ST RD and ST RT replacements
+    |> safe_replace(~r/\s\s/, " ")
+    |> safe_replace(~r/\(\s/, "(")
+    |> safe_replace(~r/\|ST (RD|ROAD) \#?(\d+)/, "|STATE_ROAD_\\2")
+    |> safe_replace(~r/\|ST (RT|RTE|ROUTE) \#?(\d+)/, "|STATE_ROUTE_\\2")
     |> safe_replace(~r/\b(RT|RTE|ROUTE) \#?(\d+)/, "ROUTE_\\2")
     # TODO: The digits and the directionals are only there if we standardize_highways at the beginning of the process not the way that standardize_address_list does it
     # We can try doing standardize_highways at the beginning in those cases or we can make the digits optional in the regexes below.
@@ -187,41 +196,54 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/^JCT\.? (OF )?(.+\&.+)/, "\\2")
   end
 
-  def pre_standardize_address(messy_address) when not is_binary(messy_address), do: nil
+  @doc """
+  Preliminiary standardizations to be done first before Parser.clean_address_line decides how to standardize and/or parse the address.
+  """
+  def pre_standardize_address(messy_address, _pre_std) when not is_binary(messy_address), do: nil
 
-  def pre_standardize_address(messy_address) do
+  def pre_standardize_address(messy_address, false), do: messy_address
+
+  def pre_standardize_address(messy_address, true) do
     messy_address
     |> String.upcase()
-    # underscores and pipes are special characters in our future processing so ensure neither exists in the source address
-    |> safe_replace(~r[\_\|], " ")
+    |> String.trim()
+    # underscores, pipes, and carets are special characters in our future processing so ensure none exists in the source address
+    |> safe_replace(~r/[\_\|\^]/, " ")
     # In FRS the number is frequently scrunched up against the first word -- if it's 3 chars or more it's not a unit or directional
     |> safe_replace(~r/^(\d+)([A-Z]{3,})/, "\\1 \\2")
     # Handle 123-44TH ST
     |> safe_replace(~r/^(\d+)\-(\d+(ST|ND|RD|TH))\s/, "\\1 \\2 ")
+    # If the address ends with numbers or single characters seperated by an ampersand it's usually "12 MAIN ST STE 8 & 9"
+    # This causes issues for the parser so we pin them together then after processing expand it back to ampersands
+    |> safe_replace(~r/ (\d+|[A-Z]) \& (\d+|[A-Z])$/, " \\1^\\2")
+    # Mark trailing parenthesis to second line represented by a pipe character at this point
+    |> safe_replace(~r/^(.+)\((.+)\)$/, "\\1|\\2")
+    # |> String.replace_suffix(")", "")
+    |> safe_replace(~r/\s\|/, "|")
   end
 
   @doc """
-  If there is a single comma in the addr hugging a suffix or highway, remove the trailing part to parenthesis as it is 
+  If there is a single comma in the addr hugging a suffix or highway, remove the trailing part to a pipe as it is 
   an additional designation not suitable for normal parsing.  The parser will then remove the parenthetical to a second address line.
   """
-  def parenthesize_single_comma_hugging_suffix(addr) do
+  def pipe_single_comma_hugging_suffix(addr) do
     split_by_commas = String.split(addr, ",")
     split_by_slash = String.split(addr, "/")
 
     case {length(split_by_commas), length(split_by_slash)} do
-      {2, _} -> parenthesize_if_suffix(split_by_commas, addr)
-      {_, 2} -> parenthesize_if_suffix(split_by_slash, addr)
+      {2, _} -> pipe_if_suffix(split_by_commas, addr)
+      {_, 2} -> pipe_if_suffix(split_by_slash, addr)
       _ -> addr
     end
   end
 
-  defp parenthesize_if_suffix(split_addr, addr) do
+  defp pipe_if_suffix(split_addr, addr) do
     [first | [last]] = split_addr
     possible_suffix_or_hwy = first |> String.split(" ") |> List.last()
 
     if AddressUS.Parser.AddrLine.get_suffix_value(possible_suffix_or_hwy) ||
          String.contains?(possible_suffix_or_hwy, "_") do
-      first <> " (" <> last <> ")"
+      first <> "|" <> last
     else
       addr
     end
