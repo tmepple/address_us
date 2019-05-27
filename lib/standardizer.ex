@@ -216,8 +216,9 @@ defmodule AddressUS.Parser.Standardizer do
     # If the address ends with numbers or single characters seperated by an ampersand it's usually "12 MAIN ST STE 8 & 9"
     # This causes issues for the parser so we pin them together then after processing expand it back to ampersands
     |> safe_replace(~r/ (\d+|[A-Z]) \& (\d+|[A-Z])$/, " \\1^\\2")
-    # Mark trailing parenthesis to second line represented by a pipe character at this point
+    # Mark trailing parenthesis or unclosed parens to second line represented by a pipe character at this point
     |> safe_replace(~r/^(.+)\((.+)\)$/, "\\1|\\2")
+    |> safe_replace(~r/^(.+)\(([^\)]+)$/, "\\1|\\2")
     # |> String.replace_suffix(")", "")
     |> safe_replace(~r/\s\|/, "|")
   end

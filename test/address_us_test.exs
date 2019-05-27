@@ -1906,5 +1906,8 @@ defmodule AddressUSTest do
 
     assert clean_address_line("3151 LINCOLN WAY W PO DRAWER C") ==
              "3151 LINCOLN WAY W\nPO DRAWER C"
+
+    assert clean_address_line("3304 E 82ND ST (E OF RAW MATL BL") ==
+             "3304 E 82ND ST\nE OF RAW MATL BL"
   end
 end
