@@ -1918,5 +1918,6 @@ defmodule AddressUSTest do
     assert clean_address_line("350 EAST 40TH STREET PO BX 68") == "350 E 40TH ST\nPO BOX 68"
 
     assert clean_address_line("3704 COUNTRY RD 229") == "3704 COUNTRY ROAD 229"
+    assert clean_address_line("1101 DELPHOS AVE P O BX 180") == "1101 DELPHOS AVE\nPO BOX 180"
   end
 end
