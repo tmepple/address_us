@@ -1012,7 +1012,9 @@ defmodule AddressUS.Parser.AddrLine do
             Enum.take(street_list, (length(street_list) - addtl_start_index) * -1)
             |> Enum.join(" ")
 
-          ret_addtl = append_string_with_space(additional, new_addtl)
+          # ret_addtl = append_string_with_space(additional, new_addtl)
+          ret_addtl = append_string_with_space(new_addtl, additional)
+
           {ret_street, ret_addtl, ret_suffix, ret_postdirectional}
       end
     else

@@ -3,19 +3,31 @@ defmodule AddressUS.Parser.Helpers do
 
   require Logger
 
-  def append_string(nil, str) do
+  def append_string(nil, nil), do: ""
+
+  def append_string(nil, str) when is_binary(str) do
     String.trim(str) |> String.replace_prefix("-", "")
   end
 
-  def append_string(str1, str2) do
+  def append_string(str, nil) when is_binary(str) do
+    String.trim(str) |> String.replace_prefix("-", "")
+  end
+
+  def append_string(str1, str2) when is_binary(str1) and is_binary(str2) do
     String.trim(str1) <> String.trim(String.replace_prefix(str2, "-", ""))
   end
 
-  def append_string_with_space(nil, str) do
+  def append_string_with_space(nil, nil), do: ""
+
+  def append_string_with_space(nil, str) when is_binary(str) do
     String.trim(str) |> String.replace_prefix("-", "")
   end
 
-  def append_string_with_space(str1, str2) do
+  def append_string_with_space(str, nil) when is_binary(str) do
+    String.trim(str) |> String.replace_prefix("-", "")
+  end
+
+  def append_string_with_space(str1, str2) when is_binary(str1) and is_binary(str2) do
     (String.trim(str1) <> " " <> String.trim(String.replace_prefix(str2, "-", "")))
     |> String.trim()
   end

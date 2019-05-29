@@ -334,7 +334,8 @@ defmodule AddressUSConfig do
       "HANGER" => "HNGR",
       "LOBBY" => "LBBY",
       "LOT" => "LOT",
-      "LOWER" => "LOWR",
+      # False positives with Roads including Lower
+      # "LOWER" => "LOWR",
       "MAILSTOP" => "MS",
       "OFFICE" => "OFC",
       "PENTHOUSE" => "PH",
@@ -348,8 +349,9 @@ defmodule AddressUSConfig do
       # "STOP" => "STOP",
       "SUITE" => "STE",
       "TRAILER" => "TRLR",
-      "UNIT" => "UNIT",
-      "UPPER" => "UPPR"
+      "UNIT" => "UNIT"
+      # False positives with roads including Upper
+      # "UPPER" => "UPPR"
     }
   end
 

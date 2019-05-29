@@ -431,6 +431,8 @@ defmodule AddressUSTest do
   ## Random addresses that have broken this library at some point.
   ############################################################################
 
+  # NOTE: Decided to remove hypens not surrounded by numbers to allow other corner cases as Pub 28 recommends replacing them
+  # with spaces in street names and cities
   test "Parse address: A. P. Croll & Son 2299 Lewes-Georgetown Hwy, Georgetown
       DE 19947-1114" do
     desired_result = %Address{
@@ -438,7 +440,7 @@ defmodule AddressUSTest do
       postal: "19947",
       plus_4: "1114",
       state: "DE",
-      street: %Street{primary_number: "2299", suffix: "Hwy", name: "Lewes-Georgetown"}
+      street: %Street{primary_number: "2299", suffix: "Hwy", name: "Lewes Georgetown"}
     }
 
     result = parse_address("A. P. Croll & Son 2299 Lewes-Georgetown Hwy
@@ -1919,5 +1921,16 @@ defmodule AddressUSTest do
 
     assert clean_address_line("3704 COUNTRY RD 229") == "3704 COUNTRY ROAD 229"
     assert clean_address_line("1101 DELPHOS AVE P O BX 180") == "1101 DELPHOS AVE\nPO BOX 180"
+
+    assert clean_address_line("(NE CORNER) WESTERVILLE & MORSE") ==
+             "WESTERVILLE & MORSE\nNE CORNER"
+
+    assert clean_address_line("PO BOX 1308 4350 ALLEN RD") == "4350 ALLEN RD\nPO BOX 1308"
+    assert clean_address_line("ROUTE 2 PO BOX 129A") == "ROUTE 2\nPO BOX 129A"
+    assert clean_address_line("204 MAIN & MCCLAIN ST BX 531") == "204 MAIN & MCCLAIN ST\nBOX 531"
+    assert clean_address_line("10850 KIRK RD RD 1 BX 165C") == "10850 KIRK RD\nROAD 1 BOX 165C"
+    assert clean_address_line("11000 HUNTINGTON ROAD BX W") == "11000 HUNTINGTON RD\nBOX W"
+    assert clean_address_line("11141 FREMONT PIKE-US RT 20") == "11141 FREMONT PIKE\nUS ROUTE 20"
+    assert clean_address_line("PO BX 37, 209 N MAIN STREET.") == "209 N MAIN ST\nPO BOX 37"
   end
 end
