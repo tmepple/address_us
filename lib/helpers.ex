@@ -37,6 +37,7 @@ defmodule AddressUS.Parser.Helpers do
     |> safe_replace("^", " & ")
     |> safe_replace("_", " ")
     |> safe_replace("|", "\n")
+    |> only_retain_first_newline()
     |> title_case()
   end
 
@@ -45,6 +46,19 @@ defmodule AddressUS.Parser.Helpers do
     |> safe_replace("^", " & ")
     |> safe_replace("_", " ")
     |> safe_replace("|", "\n")
+    |> only_retain_first_newline()
+  end
+
+  defp only_retain_first_newline(nil), do: nil
+
+  defp only_retain_first_newline(str) do
+    split = String.split(str, "\n", max_parts: 2)
+
+    if length(split) == 1,
+      do: str,
+      else:
+        String.trim(List.first(split)) <>
+          "\n" <> String.trim(String.replace(List.last(split), "\n", " "))
   end
 
   # Cleans up hyphenated street values by removing the hyphen and returing the
