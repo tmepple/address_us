@@ -21,6 +21,7 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\sMLK\s/, " MARTIN LUTHER KING ")
     |> safe_replace(~r/\sMLKING\s/, " MARTIN LUTHER KING ")
     |> safe_replace(~r/\sML KING\s/, " MARTIN LUTHER KING ")
+    # If whole address is in parenthesis, remove them
     |> safe_replace(~r/^\((.+)\)$/, "\\1")
     |> safe_replace(~r/(.+)\(/, "\\1 (")
     |> safe_replace(~r/\)(.+)/, ") \\1")
@@ -63,9 +64,11 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/(\d+)[\'\`]\s(\D)/, "\\1 FT \\2")
     |> safe_replace(~r/[\'\`\?\!]/, "")
     |> safe_replace(~r/\s+/, " ")
+    # Properly space commas
     |> safe_replace(~r/,(\S)/, ", \\1")
     |> safe_replace(~r/\s,(\S)/, ", \\1")
     |> safe_replace(~r/(\S),\s/, "\\1, ")
+    |> safe_replace(~r/\s,\s/, ", ")
     # tighten hypens and remove them if they are surrounded on either side by words that are not all digits
     |> safe_replace(~r/\b(\d+)\s?\-\s?(\d+)\b/, "\\1-\\2")
     |> safe_replace(~r/\s\-+\s/, " ")
@@ -89,14 +92,12 @@ defmodule AddressUS.Parser.Standardizer do
     # |> safe_replace(~r/\bPOB ([\dA-Z]+)/, "PO BOX \\1")
     # |> safe_replace(~r/[\/\-]PO BOX/, " PO BOX")
     # |> safe_replace(~r/^R\.R\. /, "RR ")
-    |> safe_replace(~r/^(R\s?R|RURAL ROUTE)\s?\#?/, "RR ")
-    |> safe_replace(~r/^(RTE|RT|R)\s?\#?(\d+)\,?\s?BOX\s?([\dA-Z]+)$/, "RR \\2 BOX \\3")
-    |> safe_replace(~r/(RR|HC)\s?(\d+)\,\s?BOX\s?([\dA-Z]+)/, "\\1 \\2 BOX \\3")
-    |> safe_replace(~r/\s,\s/, ", ")
+    #! |> safe_replace(~r/^(R\s?R|RURAL ROUTE)\s?\#?/, "RR ")
+    #! |> safe_replace(~r/^(RTE|RT|R)\s?\#?(\d+)\,?\s?BOX\s?([\dA-Z]+)$/, "RR \\2 BOX \\3")
+    #! |> safe_replace(~r/(RR|HC)\s?(\d+)\,\s?BOX\s?([\dA-Z]+)/, "\\1 \\2 BOX \\3")
     |> safe_replace(~r/^(\d+) (THROUGH|THRU) (\d+)\s/, "\\1-\\3 ")
     |> safe_replace(~r/^(\d+) (\d+) (ST|ND|RD|TH)\s/, "\\1 \\2\\3 ")
-    # Handle N.E., S.W., etc
-    |> safe_replace(~r/\b(S|N)\.(E|W)\./, "\\1\\2")
+
     # If the street number has a letter appended to it, seperate it with a space (if a directional) or a dash (if not)
     |> safe_replace(~r/^(\d+)((?![NEWSM])[A-Z])\s/, "\\1-\\2 ")
     |> safe_replace(~r/^(\d+)([NEWS])\s/, "\\1 \\2 ")
@@ -107,16 +108,39 @@ defmodule AddressUS.Parser.Standardizer do
     |> String.trim()
   end
 
-  def move_pinned_po_boxes_to_addr2(addr) do
+  def standardize_po_box_and_rrs_maybe_move(addr, false), do: addr
+
+  def standardize_po_box_and_rrs_maybe_move(addr, true) do
     addr
-    |> safe_replace(~r/^(.+) PO BOX ([\dA-Z]+)$/, "\\1|PO_BOX_\\2")
-    |> safe_replace(~r/^PO BOX ([\dA-Z]+)[ \,\/]+(.+)$/, "\\2|PO_BOX_\\1")
+    |> safe_replace(~r/^(R\s?R|RURAL ROUTE)\s?\#?/, "RR ")
+    |> safe_replace(~r/^(RTE|RT|R)\s?\#?(\d+)\,?\s?BOX\s?([\dA-Z]+)$/, "RR \\2 BOX \\3")
+    |> safe_replace(~r/(RR|HC)\s?(\d+)\,\s?BOX\s?([\dA-Z]+)/, "\\1 \\2 BOX \\3")
+    |> safe_replace(~r/POST OFFICE BOX/, "PO BOX")
+    |> safe_replace(~r/ BX /, " BOX ")
+    |> safe_replace(~r/\bP\s?O BOX\s?([\dA-Z]+)/, "PO BOX \\1")
+    |> safe_replace(~r/\bPOB ([\dA-Z]+)/, "PO BOX \\1")
+    |> safe_replace(~r/[\/\-]PO BOX/, " PO BOX")
+    # If a PO Box is not alone and not already moved to addr2, move it now
+    |> safe_replace(~r/^([^\|]+) PO BOX ([\dA-Z]+)$/, "\\1|PO_BOX_\\2")
+    |> safe_replace(~r/^PO BOX\s*([\dA-Z]+)[ \,\/\-]+(.+)$/, "\\2|PO_BOX_\\1")
     |> safe_replace(
       ~r/ (ROAD|RD|STREET|ST|BOULEVARD|BLVD|AVENUE|AVE|\w+\_\w+) BOX ([\dA-Z]+)$/,
       " \\1|BOX \\2"
     )
-    |> safe_replace(~r/\b(ROAD|RD) \#?(\d+)/, "ROAD_\\2")
   end
+
+  # # TODO: Remove once tests pass
+  # def move_pinned_po_boxes_to_addr2(addr) do
+  #   addr
+  #   |> safe_replace(~r/^([^\|]+) PO BOX ([\dA-Z]+)$/, "\\1|PO_BOX_\\2")
+  #   |> safe_replace(~r/^PO BOX ([\dA-Z]+)[ \,\/]+(.+)$/, "\\2|PO_BOX_\\1")
+  #   |> safe_replace(
+  #     ~r/ (ROAD|RD|STREET|ST|BOULEVARD|BLVD|AVENUE|AVE|\w+\_\w+) BOX ([\dA-Z]+)$/,
+  #     " \\1|BOX \\2"
+  #   )
+
+  #   # |> safe_replace(~r/\b(ROAD|RD) \#?(\d+)/, "ROAD_\\2")
+  # end
 
   @doc "Given the parsed street address or full address line will standardize highways into USPS standard abbreviations"
   def standardize_highways(street_addr_or_line, state, input \\ :line) do
@@ -157,16 +181,7 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\|ST (RD|ROAD) \#?(\d+)/, "|STATE_ROAD_\\2")
     |> safe_replace(~r/\|ST (RT|RTE|ROUTE) \#?(\d+)/, "|STATE_ROUTE_\\2")
     |> safe_replace(~r/\b(RT|RTE|ROUTE) \#?(\d+)/, "ROUTE_\\2")
-    # |> safe_replace(~r/\b(ROAD|RD) \#?(\d+)/, "ROAD_\\2")
-
-    # TODO: The digits and the directionals are only there if we standardize_highways at the beginning of the process not the way that standardize_address_list does it
-    # We can try doing standardize_highways at the beginning in those cases or we can make the digits optional in the regexes below.
-    # Or we can split out these four lines into new functions (with and without digits) and call them appropriately at the right time.
-    # |> safe_replace(~r/(\d+) OLD (HWY|HIGHWAY) \#?(\d+)/, "\\1 OLD_HIGHWAY_\\3")
-    # |> safe_replace(~r/(\d+) (N|E|S|W) OLD (HWY|HIGHWAY) \#?(\d+)/, "\\1 \\2 OLD_HIGHWAY_\\4")
-    # |> safe_replace(~r/(\d+) (HWY|HIGHWAY) \#?(\d+)/, "\\1 HIGHWAY_\\3")
-    # |> safe_replace(~r/(\d+) (N|E|S|W) (HWY|HIGHWAY) \#?(\d+)/, "\\1 \\2 HIGHWAY_\\4")
-    # |> safe_replace(~r/\bS\s?R\ \#?(\d+)/, standardize_sr(state))
+    |> safe_replace(~r/\b(ROAD|RD) \#?(\d+)/, "ROAD_\\2")
     |> safe_replace(~r/\bS\s?R\s?\#?(\d+)/, standardize_sr(state))
     |> String.trim()
     |> standardize_bare_highways(input)
@@ -188,11 +203,12 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/^(\d+) ([NEWS]\s)?((?![NEWS])[A-Z])\s(\d+)\b/, "\\1 \\2\\3-\\4")
   end
 
-  defp standardize_bare_highways(street_addr_or_line, :street_addr) do
-    street_addr_or_line
-    |> safe_replace(~r/OLD (HWY|HIGHWAY) \#?(\d+)/, "OLD_HIGHWAY_\\2")
-    |> safe_replace(~r/(HWY|HIGHWAY) \#?(\d+)/, "HIGHWAY_\\2")
-  end
+  # TODO: Remove this no-longer used block
+  # defp standardize_bare_highways(street_addr_or_line, :street_addr) do
+  #   street_addr_or_line
+  #   |> safe_replace(~r/OLD (HWY|HIGHWAY) \#?(\d+)/, "OLD_HIGHWAY_\\2")
+  #   |> safe_replace(~r/(HWY|HIGHWAY) \#?(\d+)/, "HIGHWAY_\\2")
+  # end
 
   def standardize_intersections(street_name) do
     street_name
@@ -225,19 +241,16 @@ defmodule AddressUS.Parser.Standardizer do
     # If the address ends with numbers or single characters seperated by an ampersand it's usually "12 MAIN ST STE 8 & 9"
     # This causes issues for the parser so we pin them together then after processing expand it back to ampersands
     |> safe_replace(~r/ (\d+|[A-Z]) \& (\d+|[A-Z])$/, " \\1^\\2")
-    # PO Box Standardizations
-    # First remove periods that are not adjacent to digits
+    # Handle N.E., S.W., etc
+    |> safe_replace(~r/\b(S|N)\.(E|W)\./, "\\1\\2")
+    # Remove periods that are not adjacent to digits
     |> safe_replace(~r/(?!\d)\.(?!\d)/, " ")
     |> safe_replace("  ", " ")
-    |> safe_replace(~r/POST OFFICE BOX/, "PO BOX")
-    # |> safe_replace(~r/P O BOX/, "PO BOX")
-    # |> safe_replace(~r/P\.O\. BOX/, "PO BOX")
-    # |> safe_replace(~r/P\.O\. BOX/, "PO BOX")
-    # |> safe_replace(~r/P\. O\. BOX/, "PO BOX")
-    |> safe_replace(~r/ BX /, " BOX ")
-    |> safe_replace(~r/\bP\s?O BOX\s?([\dA-Z]+)/, "PO BOX \\1")
-    |> safe_replace(~r/\bPOB ([\dA-Z]+)/, "PO BOX \\1")
-    |> safe_replace(~r/[\/\-]PO BOX/, " PO BOX")
+    #! |> safe_replace(~r/POST OFFICE BOX/, "PO BOX")
+    #! |> safe_replace(~r/ BX /, " BOX ")
+    #! |> safe_replace(~r/\bP\s?O BOX\s?([\dA-Z]+)/, "PO BOX \\1")
+    #! |> safe_replace(~r/\bPOB ([\dA-Z]+)/, "PO BOX \\1")
+    #! |> safe_replace(~r/[\/\-]PO BOX/, " PO BOX")
     # Mark leading or trailing parenthesis or unclosed parens to second line represented by a pipe character at this point
     |> safe_replace(~r/^(.+)\((.+)\)$/, "\\1|\\2")
     |> safe_replace(~r/^\((.+)\)(.+)$/, "\\2|\\1")
@@ -289,10 +302,10 @@ defmodule AddressUS.Parser.Standardizer do
     end
   end
 
-  def postpend_prepended_po_box(messy_address) do
-    messy_address
-    |> safe_replace(~r/^((P O BOX|PO BOX)\s*(\d+))[\s\-\/\,]+(.+)/, "\\4 \\1")
-  end
+  # def postpend_prepended_po_box(messy_address) do
+  #   messy_address
+  #   |> safe_replace(~r/^((P O BOX|PO BOX)\s*(\d+))[\s\-\/\,]+(.+)/, "\\4 \\1")
+  # end
 
   ############################################################################
   ## Private Functions

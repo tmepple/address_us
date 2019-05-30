@@ -1932,5 +1932,8 @@ defmodule AddressUSTest do
     assert clean_address_line("11000 HUNTINGTON ROAD BX W") == "11000 HUNTINGTON RD\nBOX W"
     assert clean_address_line("11141 FREMONT PIKE-US RT 20") == "11141 FREMONT PIKE\nUS ROUTE 20"
     assert clean_address_line("PO BX 37, 209 N MAIN STREET.") == "209 N MAIN ST\nPO BOX 37"
+
+    assert clean_address_line("440 E BLAH STREET, MAIN & MARKET") ==
+             "440 E BLAH ST\nMAIN & MARKET"
   end
 end

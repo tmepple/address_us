@@ -117,10 +117,11 @@ defmodule AddressUS.Parser do
 
     messy_address
     |> Standardizer.pre_standardize_address(pre_std)
+    |> Standardizer.standardize_po_box_and_rrs_maybe_move(pre_std)
     |> Standardizer.standardize_intersections()
     |> Standardizer.standardize_address()
     |> Standardizer.standardize_highways(state)
-    |> Standardizer.move_pinned_po_boxes_to_addr2()
+    # |> Standardizer.move_pinned_po_boxes_to_addr2()
     # Text following a single comma hugging a suffix (ie 12 MAIN ST, HIGHWAY 31 S) is likely additional information which
     # causes issues when parsed (i.e. 12 MAIN ST S) so we should pipe delimit it here so when it gets parsed it is properly
     # called an "additional designation"
@@ -146,12 +147,11 @@ defmodule AddressUS.Parser do
 
     messy_address
     |> Standardizer.pre_standardize_address(pre_std)
+    |> Standardizer.standardize_po_box_and_rrs_maybe_move(pre_std)
     |> Standardizer.standardize_intersections()
     |> Standardizer.standardize_address()
     |> Standardizer.standardize_highways(state)
-    |> Standardizer.move_pinned_po_boxes_to_addr2()
-    # |> safe_replace("_", " ")
-    # |> safe_replace("^", " & ")
+    # |> Standardizer.move_pinned_po_boxes_to_addr2()
     |> apply_casing_replace_pins(casing)
   end
 
@@ -170,7 +170,7 @@ defmodule AddressUS.Parser do
     messy_address =
       messy_address
       |> Standardizer.pre_standardize_address(true)
-      |> Standardizer.postpend_prepended_po_box()
+      |> Standardizer.standardize_po_box_and_rrs_maybe_move(true)
 
     valid_number? =
       Regex.match?(
@@ -197,7 +197,7 @@ defmodule AddressUS.Parser do
           # if there's a slash in the first item that's not a fraction then check to see if it's hugging a suffix or highway
           # if so then the intersection is additional information and is put in line 2.  If not then we should just standardize
           # as there is too much ambiguity. 
-          if Regex.match?(~r/(\D\/|\/\D)/, List.first(split_address)) do
+          if Regex.match?(~r/(\D\/|\/\D|\,)/, List.first(split_address)) do
             if max_one_comma_slash_hugging_suffix_or_hwy?(List.first(split_address)) do
               parse_address_line_fmt(messy_address, state, casing: casing, pre_std: false)
             else
@@ -212,21 +212,17 @@ defmodule AddressUS.Parser do
               )
               |> String.split("\n", parts: 2)
 
+            std_after_ampersand =
+              standardize_address_line(List.last(split_address), state,
+                casing: casing,
+                pre_std: false
+              )
+
             if length(split_line) == 1 do
-              List.first(split_line) <>
-                " & " <>
-                standardize_address_line(List.last(split_address), state,
-                  casing: casing,
-                  pre_std: false
-                )
+              List.first(split_line) <> " & " <> std_after_ampersand
             else
               List.first(split_line) <>
-                " & " <>
-                standardize_address_line(List.last(split_address), state,
-                  casing: casing,
-                  pre_std: false
-                ) <>
-                "\n" <> List.last(split_line)
+                " & " <> std_after_ampersand <> "\n" <> List.last(split_line)
             end
           end
         end
