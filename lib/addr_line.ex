@@ -11,7 +11,7 @@ defmodule AddressUS.Parser.AddrLine do
   def parse_address_list([], _, _), do: nil
   def parse_address_list([""], _, _), do: nil
 
-  def parse_address_list(address, state, casing) do
+  def parse_address_list(address, _state, casing) do
     cleaned_address =
       Enum.map(address, &safe_replace(&1, ",", ""))
       |> log_term("cleaned")
@@ -155,24 +155,6 @@ defmodule AddressUS.Parser.AddrLine do
   end
 
   # PRIVATE FUNCTIONS (Alphabetical Order)
-
-  # Returns the appropriate direction value if a direction is found.
-  defp get_direction_value(value) when not is_binary(value), do: ""
-
-  defp get_direction_value(value) do
-    directions = AddressUSConfig.directions()
-
-    cond do
-      safe_has_key?(directions, value) ->
-        Map.get(directions, value)
-
-      Map.values(directions) |> Enum.member?(value) ->
-        value
-
-      true ->
-        ""
-    end
-  end
 
   # Parses the number out of the address list and returns
   # {number, box, possible_secondary_value, possible_secondary_designator}
@@ -415,10 +397,15 @@ defmodule AddressUS.Parser.AddrLine do
         false -> direction_value <> post_direction
       end
 
-    log_term({head, direction_value, new_direction, post_direction, address, tail}, "before cond")
+    log_term(
+      {head, direction_value, new_direction, post_direction, address, tail},
+      "gpd_before_cond"
+    )
 
     cond do
       attached_post_direction ->
+        log_term("gpd 1")
+
         get_post_direction(
           [attached_post_direction | [String.slice(head, 0..-2) | tail]],
           backup,
@@ -429,18 +416,27 @@ defmodule AddressUS.Parser.AddrLine do
 
       # Handle address like "1404 W Avenue E"
       get_suffix_value(head) == "AVE" &&
-          (get_direction_value(tail_head) != "" or string_is_number_or_fraction?(tail_head)) ->
+          ((get_direction_value(tail_head) != "" and not is_spelled_out_direction?(tail_head)) or
+             string_is_number_or_fraction?(tail_head)) ->
+        log_term("gpd 2")
+
         get_post_direction(backup, backup, nil, raw_pd, true)
 
       # If there is only one term left (an address number) then we likely were too aggressive about
       # and we are not dealing with a post_direction anyway i.e. "101 W North" 
       address_length == 1 ->
+        log_term("gpd 4")
+
         get_post_direction(backup, backup, nil, raw_pd, true)
 
       get_direction_value(head) == "" ->
+        log_term("gpd 5")
+
         get_post_direction(address, backup, post_direction, raw_pd, true)
 
       true ->
+        log_term("gpd 6")
+
         get_post_direction(tail, backup, new_direction, append_string(raw_pd, head), false)
     end
   end
@@ -562,7 +558,6 @@ defmodule AddressUS.Parser.AddrLine do
           # NOTE: Unsure what this code does as all existing tests run without it and it caused Box parsing issues
           # contains_po_box?(tail) || is_state?(tail_head) ->
           #   log_term("at 1")
-          #   IO.inspect(backup, label: "at 1")
           #   get_secondary(tail, backup, pmb, designator, value, addit, false)
 
           tail_head == '&' ->

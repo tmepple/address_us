@@ -440,7 +440,7 @@ defmodule AddressUSTest do
       postal: "19947",
       plus_4: "1114",
       state: "DE",
-      street: %Street{primary_number: "2299", suffix: "Hwy", name: "Lewes Georgetown"}
+      street: %Street{primary_number: "2299", suffix: "Hwy", name: "Lewes-Georgetown"}
     }
 
     result = parse_address("A. P. Croll & Son 2299 Lewes-Georgetown Hwy
@@ -1935,5 +1935,15 @@ defmodule AddressUSTest do
 
     assert clean_address_line("440 E BLAH STREET, MAIN & MARKET") ==
              "440 E BLAH ST\nMAIN & MARKET"
+
+    assert clean_address_line("5400 LAUBY ROAD # 4") == "5400 LAUBY RD\n#4"
+
+    # Due to ambiguity of the street name (is it NORTH AVE or N AVENUE) the following 2 addresses avoid typical parsing
+    assert clean_address_line("50 NORTH AVENUE NE") == "50 NORTH AVENUE NE"
+    assert clean_address_line("50 NORTH AVENUE") == "50 NORTH AVENUE"
+    # If a comma hugs a suffix but is followed by a direction, then don't remove it to addr2
+    assert clean_address_line("50 NORTH AVENUE, NE") == "50 NORTH AVENUE NE"
+    assert clean_address_line("50 NORTH AVENUE, NE SIDE") == "50 NORTH AVENUE\nNE SIDE"
+    assert clean_address_line("29121 HIDE-A-WAY HILLS") == "29121 HIDE-A-WAY HILLS"
   end
 end

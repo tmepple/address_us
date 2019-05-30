@@ -108,6 +108,32 @@ defmodule AddressUS.Parser.Helpers do
 
   def empty_str_to_nil(str), do: str
 
+  # Returns the appropriate direction value if a direction is found.
+  def get_direction_value(value) when not is_binary(value), do: ""
+
+  def get_direction_value(value) do
+    directions = AddressUSConfig.directions()
+    value = String.trim(value)
+
+    cond do
+      safe_has_key?(directions, value) ->
+        Map.get(directions, value)
+
+      Map.values(directions) |> Enum.member?(value) ->
+        value
+
+      true ->
+        ""
+    end
+  end
+
+  def is_spelled_out_direction?(value) do
+    directions = AddressUSConfig.directions()
+    value = String.trim(value)
+
+    Enum.member?(Map.keys(directions), value)
+  end
+
   def is_highway?(word) when not is_binary(word), do: false
 
   def is_highway?(word) do

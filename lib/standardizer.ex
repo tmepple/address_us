@@ -1,6 +1,45 @@
 defmodule AddressUS.Parser.Standardizer do
   import AddressUS.Parser.Helpers
 
+  @doc """
+  Preliminiary standardizations to be done first before Parser.clean_address_line decides how to standardize and/or parse the address.
+  """
+  def pre_standardize_address(messy_address, _pre_std) when not is_binary(messy_address), do: nil
+
+  def pre_standardize_address(messy_address, false), do: messy_address
+
+  def pre_standardize_address(messy_address, true) do
+    messy_address
+    |> String.upcase()
+    |> String.trim()
+    # Remove any non-ASCII characters from address
+    |> safe_replace(~r/[^\x00-\x7F]/, "")
+    # Underscores, pipes, and carets are special characters in our future processing so ensure none exists in the source address
+    |> safe_replace(~r/[\_\|\^]/, " ")
+    # Embedded newlines and tabs should be replaced
+    |> safe_replace(~r/\n/, ", ")
+    |> safe_replace(~r/\t/, " ")
+    # In FRS the number is frequently scrunched up against the first word -- if it's 3 chars or more it's not a unit or directional
+    |> safe_replace(~r/^(\d+)([A-Z]{3,})/, "\\1 \\2")
+    # Handle 123-44TH ST
+    |> safe_replace(~r/^(\d+)\-(\d+(ST|ND|RD|TH))\s/, "\\1 \\2 ")
+    # If the address ends with numbers or single characters seperated by an ampersand it's usually "12 MAIN ST STE 8 & 9"
+    # This causes issues for the parser so we pin them together then after processing expand it back to ampersands
+    |> safe_replace(~r/ (\d+|[A-Z]) \& (\d+|[A-Z])$/, " \\1^\\2")
+    # Handle N.E., S.W., etc
+    |> safe_replace(~r/\b(S|N)\.(E|W)\./, "\\1\\2")
+    # Remove periods that are not adjacent to digits
+    |> safe_replace(~r/(?!\d)\.(?!\d)/, " ")
+    |> safe_replace("  ", " ")
+    # Mark leading or trailing parenthesis or unclosed parens to second line represented by a pipe character at this point
+    |> safe_replace(~r/^(.+)\((.+)\)$/, "\\1|\\2")
+    |> safe_replace(~r/^\((.+)\)(.+)$/, "\\2|\\1")
+    |> safe_replace(~r/^(.+)\(([^\)]+)$/, "\\1|\\2")
+    # |> String.replace_suffix(")", "")
+    |> safe_replace(~r/\s\|/, "|")
+    |> eliminate_repitition()
+  end
+
   # Standardizes the spacing around the commas, periods, and newlines and then
   # deletes the periods per the best practices outlined by the USPS.  It also
   # replaces newline characters with commas, and replaces '# <value>' with
@@ -9,12 +48,12 @@ defmodule AddressUS.Parser.Standardizer do
 
   def standardize_address(messy_address) do
     messy_address
+    # Remove leading pound signs
     |> safe_replace(~r/^\#\s?/, "")
     |> safe_replace(~r/ UNITED STATES$/, "")
     |> safe_replace(~r/ US$/, "")
-    # |> safe_replace(~r/US$/, "")
-    # |> safe_replace(~r/\(SEC\)/, "")
-    |> safe_replace(~r/U\.S\./, "US")
+    # Periods are already gone
+    # |> safe_replace(~r/U\.S\./, "US")
     |> safe_replace(~r/\sU\sS\s/, " US ")
     |> safe_replace(~r/UNITED STATES/, "US")
     |> safe_replace(~r/\sM L KING\s/, " MARTIN LUTHER KING ")
@@ -23,88 +62,76 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\sML KING\s/, " MARTIN LUTHER KING ")
     # If whole address is in parenthesis, remove them
     |> safe_replace(~r/^\((.+)\)$/, "\\1")
-    |> safe_replace(~r/(.+)\(/, "\\1 (")
-    |> safe_replace(~r/\)(.+)/, ") \\1")
-    |> safe_replace(~r/(.+)\&/, "\\1 &")
-    |> safe_replace(~r/\&(.+)/, "& \\1")
-    # NOTE: Don't remove parenthesis yet
-    # |> safe_replace(~r/\((.+)\)/, "\\1")
-    |> safe_replace(~r/\sI.E.\s/, "")
-    |> safe_replace(~r/\sET\sAL\s/, "")
-    |> safe_replace(~r/\sIN\sCARE\sOF\s/, "")
-    |> safe_replace(~r/\sCARE\sOF\s/, "")
-    # Commented since the meaning "care of" wasn't covered by tests and frequently also means "corner of" which we want to retain
-    # |> safe_replace(~r/C\/O\s/, "")
-    |> safe_replace(~r/\sBY\sPASS\b/, " BYPASS ")
-    |> safe_replace(~r/\sBY\s/, "")
-    |> safe_replace(~r/\sFOR\s/, "")
-    |> safe_replace(~r/\sALSO\s/, "")
-    |> safe_replace(~r/\sATTENTION\s/, "")
-    |> safe_replace(~r/\sATTN\s/, "")
-    # Following line is commented out as not sure the purpose -- no existing tests target it
-    # |> safe_replace(~r/\ss#\ss(\S)/, " #\\1")
-    # # |> safe_replace(~r/(?i)P O BOX/, "PO BOX")
-    # |> safe_replace(~r/\bUS (\d+)/, "US HIGHWAY \\1")
-    # |> safe_replace(~r/\bUS HWY (\d+)/, "US HIGHWAY \\1")
-    # |> safe_replace(~r/(\d+) HWY (\d+)/, "\\1 HIGHWAY \\2")
-    # |> safe_replace(~r/\bCR (\d+)/, "COUNTY ROAD \\1")
-    # |> safe_replace(~r/\bCO RD (\d+)/, "COUNTY ROAD \\1")
-    # |> safe_replace(~r/\bST RD (\d+)/, "STATE ROAD \\1")
-    # # TODO: In certain states, change this to STATE ROUTE instead
-    # |> safe_replace(~r/SR (\d+)/, "STATE ROAD \\1")
+    # Punctuation replacements
+    # Ensure space delimited parens, ampersands
+    |> safe_replace(~r/(\S)\(/, "\\1 (")
+    |> safe_replace(~r/\)(\S)/, ") \\1")
+    |> safe_replace(~r/(\S)\&/, "\\1 &")
+    |> safe_replace(~r/\&(\S)/, "& \\1")
+    # Ensure space before but not after pound signs
     |> safe_replace(~r/(.+)#/, "\\1 #")
-    |> safe_replace(~r/\n/, ", ")
-    |> safe_replace(~r/\t/, " ")
-    # Slashes could mean intersection or adding an additional designation to existing street name
-    # Since it's ambiguous we need to retain them
-    # |> safe_replace(~r/\/(\D)/, " \\1")
-    # |> safe_replace(~r/(\D)\//, "\\1 ")
-    |> safe_replace(~r/\"/, "")
-    # Apostrophes or backticks against a number with a non-number afterwards usually refer to feet.  Otherwise remove them.
+    |> safe_replace(~r/\#\s+/, "#")
+    # Apostrophes or backticks against a number with a non-number afterwards usually refer to feet.  
+    # Otherwise remove them and other quotes, question marks, and exclamation marks
     |> safe_replace(~r/(\d+)[\'\`]\s(\D)/, "\\1 FT \\2")
-    |> safe_replace(~r/[\'\`\?\!]/, "")
+    |> safe_replace(~r/[\'\`\?\!\"]/, "")
     |> safe_replace(~r/\s+/, " ")
     # Properly space commas
     |> safe_replace(~r/,(\S)/, ", \\1")
     |> safe_replace(~r/\s,(\S)/, ", \\1")
     |> safe_replace(~r/(\S),\s/, "\\1, ")
     |> safe_replace(~r/\s,\s/, ", ")
-    # tighten hypens and remove them if they are surrounded on either side by words that are not all digits
+    # Tighten hypens and remove them if they are surrounded on either side by words that are not all digits
     |> safe_replace(~r/\b(\d+)\s?\-\s?(\d+)\b/, "\\1-\\2")
     |> safe_replace(~r/\s\-+\s/, " ")
     |> safe_replace(~r/-\s+/, "-")
     |> safe_replace(~r/\s+\-/, "-")
-    |> safe_replace(~r/(\D+)\-(\D+)/, "\\1 \\2")
-    # |> safe_replace(~r/\.(\S)/, ". \\1")
-    # |> safe_replace(~r/\s\.\s/, ". ")
-    # |> safe_replace(~r/\s\.(\S)/, ". \\1")
-    # |> safe_replace(~r/(\S)\.\s/, "\\1. ")
-    # # remove periods that are not adjacent to digits
-    # |> safe_replace(~r/(?!\d)\.(?!\d)/, " ")
-    # |> safe_replace("  ", " ")
-    # |> safe_replace(~r/POST OFFICE BOX/, "PO BOX")
-    # # |> safe_replace(~r/P O BOX/, "PO BOX")
-    # # |> safe_replace(~r/P\.O\. BOX/, "PO BOX")
-    # # |> safe_replace(~r/P\.O\. BOX/, "PO BOX")
-    # # |> safe_replace(~r/P\. O\. BOX/, "PO BOX")
-    # |> safe_replace(~r/ BX /, " BOX ")
-    # |> safe_replace(~r/\bP\s?O BOX\s?([\dA-Z]+)/, "PO BOX \\1")
-    # |> safe_replace(~r/\bPOB ([\dA-Z]+)/, "PO BOX \\1")
-    # |> safe_replace(~r/[\/\-]PO BOX/, " PO BOX")
-    # |> safe_replace(~r/^R\.R\. /, "RR ")
-    #! |> safe_replace(~r/^(R\s?R|RURAL ROUTE)\s?\#?/, "RR ")
-    #! |> safe_replace(~r/^(RTE|RT|R)\s?\#?(\d+)\,?\s?BOX\s?([\dA-Z]+)$/, "RR \\2 BOX \\3")
-    #! |> safe_replace(~r/(RR|HC)\s?(\d+)\,\s?BOX\s?([\dA-Z]+)/, "\\1 \\2 BOX \\3")
+    # |> safe_replace(~r/(\D+)\-(\D+)/, "\\1 \\2")
+    # Tighten slashes and backslashes
+    |> safe_replace(~r/\s?([\\\/])\s?/, "\\1")
+    # Address ranges with THRU should use a dash instead
     |> safe_replace(~r/^(\d+) (THROUGH|THRU) (\d+)\s/, "\\1-\\3 ")
+    # Tighten extraneous space for street names "1 ST", "2 ND", etc.
     |> safe_replace(~r/^(\d+) (\d+) (ST|ND|RD|TH)\s/, "\\1 \\2\\3 ")
-
-    # If the street number has a letter appended to it, seperate it with a space (if a directional) or a dash (if not)
+    # If the street number has a letter appended to it, seperate it with a space (if a directional or "M" (Flint, MI)) or a dash (if not)
     |> safe_replace(~r/^(\d+)((?![NEWSM])[A-Z])\s/, "\\1-\\2 ")
     |> safe_replace(~r/^(\d+)([NEWS])\s/, "\\1 \\2 ")
     # Handle addresses without spaces such as "400N-300S"
     |> safe_replace(~r/^(\d+)([NEWS])\-?(\d+)([NEWS])$/, "\\1 \\2 \\3 \\4")
-    # |> move_pinned_po_boxes_to_addr2()
+
+    # Remove mail routing instructions
+    |> safe_replace(~r/\sI.E.\s/, "")
+    |> safe_replace(~r/\sET\sAL\s/, "")
+    |> safe_replace(~r/\sIN\sCARE\sOF\s/, "")
+    |> safe_replace(~r/\sCARE\sOF\s/, "")
+    |> safe_replace(~r/\sBY\sPASS\b/, " BYPASS ")
+    |> safe_replace(~r/\sBY\s/, "")
+    |> safe_replace(~r/\sFOR\s/, "")
+    |> safe_replace(~r/\sALSO\s/, "")
+    |> safe_replace(~r/\sATTENTION\s/, "")
+    |> safe_replace(~r/\sATTN\s/, "")
     |> safe_replace("  ", " ")
+
+    ## Following lines were commented out from the original implementation but were not covered by tests
+    # Following line is commented out as not sure the purpose -- no existing tests target it
+    # |> safe_replace(~r/\ss#\ss(\S)/, " #\\1")
+    # Commented since the meaning "care of" wasn't covered by tests and frequently also means "corner of" which we want to retain
+    # |> safe_replace(~r/C\/O\s/, "")
+    # Slashes could mean intersection or adding an additional designation to existing street name
+    # Since it's ambiguous we need to retain them
+    # |> safe_replace(~r/\/(\D)/, " \\1")
+    # |> safe_replace(~r/(\D)\//, "\\1 ")
+    # Periods not involved in digits were removed in pre_standardization
+    # |> safe_replace(~r/\.(\S)/, ". \\1")
+    # |> safe_replace(~r/\s\.\s/, ". ")
+    # |> safe_replace(~r/\s\.(\S)/, ". \\1")
+    # |> safe_replace(~r/(\S)\.\s/, "\\1. ")
+    # Slashes could mean intersection or adding an additional designation to existing street name
+    # Since it's ambiguous we need to retain them
+    # |> safe_replace(~r/\/(\D)/, " \\1")
+    # |> safe_replace(~r/(\D)\//, "\\1 ")
+    # |> safe_replace(~r/\(SEC\)/, "")
+
     |> String.trim()
   end
 
@@ -128,19 +155,6 @@ defmodule AddressUS.Parser.Standardizer do
       " \\1|BOX \\2"
     )
   end
-
-  # # TODO: Remove once tests pass
-  # def move_pinned_po_boxes_to_addr2(addr) do
-  #   addr
-  #   |> safe_replace(~r/^([^\|]+) PO BOX ([\dA-Z]+)$/, "\\1|PO_BOX_\\2")
-  #   |> safe_replace(~r/^PO BOX ([\dA-Z]+)[ \,\/]+(.+)$/, "\\2|PO_BOX_\\1")
-  #   |> safe_replace(
-  #     ~r/ (ROAD|RD|STREET|ST|BOULEVARD|BLVD|AVENUE|AVE|\w+\_\w+) BOX ([\dA-Z]+)$/,
-  #     " \\1|BOX \\2"
-  #   )
-
-  #   # |> safe_replace(~r/\b(ROAD|RD) \#?(\d+)/, "ROAD_\\2")
-  # end
 
   @doc "Given the parsed street address or full address line will standardize highways into USPS standard abbreviations"
   def standardize_highways(street_addr_or_line, state, input \\ :line) do
@@ -181,7 +195,7 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\|ST (RD|ROAD) \#?(\d+)/, "|STATE_ROAD_\\2")
     |> safe_replace(~r/\|ST (RT|RTE|ROUTE) \#?(\d+)/, "|STATE_ROUTE_\\2")
     |> safe_replace(~r/\b(RT|RTE|ROUTE) \#?(\d+)/, "ROUTE_\\2")
-    |> safe_replace(~r/\b(ROAD|RD) \#?(\d+)/, "ROAD_\\2")
+    |> safe_replace(~r/\b(ROAD|RD) (\d+)/, "ROAD_\\2")
     |> safe_replace(~r/\bS\s?R\s?\#?(\d+)/, standardize_sr(state))
     |> String.trim()
     |> standardize_bare_highways(input)
@@ -219,48 +233,8 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/^JCT\.? (OF )?(.+\&.+)/, "\\2")
   end
 
-  @doc """
-  Preliminiary standardizations to be done first before Parser.clean_address_line decides how to standardize and/or parse the address.
-  """
-  def pre_standardize_address(messy_address, _pre_std) when not is_binary(messy_address), do: nil
-
-  def pre_standardize_address(messy_address, false), do: messy_address
-
-  def pre_standardize_address(messy_address, true) do
-    messy_address
-    |> String.upcase()
-    |> String.trim()
-    # Remove any non-ASCII characters from address
-    |> safe_replace(~r/[^\x00-\x7F]/, "")
-    # underscores, pipes, and carets are special characters in our future processing so ensure none exists in the source address
-    |> safe_replace(~r/[\_\|\^]/, " ")
-    # In FRS the number is frequently scrunched up against the first word -- if it's 3 chars or more it's not a unit or directional
-    |> safe_replace(~r/^(\d+)([A-Z]{3,})/, "\\1 \\2")
-    # Handle 123-44TH ST
-    |> safe_replace(~r/^(\d+)\-(\d+(ST|ND|RD|TH))\s/, "\\1 \\2 ")
-    # If the address ends with numbers or single characters seperated by an ampersand it's usually "12 MAIN ST STE 8 & 9"
-    # This causes issues for the parser so we pin them together then after processing expand it back to ampersands
-    |> safe_replace(~r/ (\d+|[A-Z]) \& (\d+|[A-Z])$/, " \\1^\\2")
-    # Handle N.E., S.W., etc
-    |> safe_replace(~r/\b(S|N)\.(E|W)\./, "\\1\\2")
-    # Remove periods that are not adjacent to digits
-    |> safe_replace(~r/(?!\d)\.(?!\d)/, " ")
-    |> safe_replace("  ", " ")
-    #! |> safe_replace(~r/POST OFFICE BOX/, "PO BOX")
-    #! |> safe_replace(~r/ BX /, " BOX ")
-    #! |> safe_replace(~r/\bP\s?O BOX\s?([\dA-Z]+)/, "PO BOX \\1")
-    #! |> safe_replace(~r/\bPOB ([\dA-Z]+)/, "PO BOX \\1")
-    #! |> safe_replace(~r/[\/\-]PO BOX/, " PO BOX")
-    # Mark leading or trailing parenthesis or unclosed parens to second line represented by a pipe character at this point
-    |> safe_replace(~r/^(.+)\((.+)\)$/, "\\1|\\2")
-    |> safe_replace(~r/^\((.+)\)(.+)$/, "\\2|\\1")
-    |> safe_replace(~r/^(.+)\(([^\)]+)$/, "\\1|\\2")
-    # |> String.replace_suffix(")", "")
-    |> safe_replace(~r/\s\|/, "|")
-    |> eliminate_repitition()
-  end
-
-  def eliminate_repitition(string) do
+  # Occasionally addresses will include the whole address repeated twice
+  defp eliminate_repitition(string) do
     no_spaces = String.replace(string, " ", "")
     len = String.length(no_spaces)
 
@@ -276,16 +250,18 @@ defmodule AddressUS.Parser.Standardizer do
   end
 
   @doc """
-  If there is a single comma in the addr hugging a suffix or highway, remove the trailing part to a pipe as it is 
-  an additional designation not suitable for normal parsing.  The parser will then remove the parenthetical to a second address line.
+  If there is a single comma in the addr hugging a suffix or highway and afterwards is text that is not a direction, 
+  remove the trailing part to a pipe as it is an additional designation not suitable for normal parsing.  
   """
-  def pipe_single_comma_hugging_suffix(addr) do
+  def pipe_single_comma_slash_hyphen_hugging_suffix(addr) do
     split_by_commas = String.split(addr, ",")
     split_by_slash = String.split(addr, "/")
+    split_by_hyphen = String.split(addr, "-")
 
-    case {length(split_by_commas), length(split_by_slash)} do
-      {2, _} -> pipe_if_suffix(split_by_commas, addr)
-      {_, 2} -> pipe_if_suffix(split_by_slash, addr)
+    case {length(split_by_commas), length(split_by_slash), length(split_by_hyphen)} do
+      {2, _, _} -> pipe_if_suffix(split_by_commas, addr)
+      {_, 2, _} -> pipe_if_suffix(split_by_slash, addr)
+      {_, _, 2} -> pipe_if_suffix(split_by_hyphen, addr)
       _ -> addr
     end
   end
@@ -294,8 +270,9 @@ defmodule AddressUS.Parser.Standardizer do
     [first | [last]] = split_addr
     possible_suffix_or_hwy = first |> String.split(" ") |> List.last()
 
-    if AddressUS.Parser.AddrLine.get_suffix_value(possible_suffix_or_hwy) ||
-         String.contains?(possible_suffix_or_hwy, "_") do
+    #! get_direction_value(last) do
+    if (AddressUS.Parser.AddrLine.get_suffix_value(possible_suffix_or_hwy) ||
+          String.contains?(possible_suffix_or_hwy, "_")) && get_direction_value(last) == "" do
       first <> "|" <> last
     else
       addr

@@ -125,7 +125,7 @@ defmodule AddressUS.Parser do
     # Text following a single comma hugging a suffix (ie 12 MAIN ST, HIGHWAY 31 S) is likely additional information which
     # causes issues when parsed (i.e. 12 MAIN ST S) so we should pipe delimit it here so when it gets parsed it is properly
     # called an "additional designation"
-    |> Standardizer.pipe_single_comma_hugging_suffix()
+    |> Standardizer.pipe_single_comma_slash_hyphen_hugging_suffix()
     |> log_term("std addr")
     |> String.split(" ")
     |> Enum.reverse()
@@ -401,9 +401,7 @@ defmodule AddressUS.Parser do
           {addr.primary_number, addr.secondary_value}
       end
 
-    # if addr.secondary_value != nil and addr.secondary_designator == nil,
-    #   do: {addr.primary_number <> "-" <> addr.secondary_value, nil},
-    #   else: {addr.primary_number, addr.secondary_value}
+    pmb = if addr.pmb == nil, do: nil, else: "#" <> addr.pmb
 
     prim_line =
       [primary_number, addr.pre_direction, addr.name, addr.suffix, addr.post_direction]
@@ -413,7 +411,7 @@ defmodule AddressUS.Parser do
 
     # [addr.pmb, addr.secondary_designator, secondary_value, addr.additional_designation]
     sec_line =
-      [addr.pmb, addr.additional_designation, addr.secondary_designator, secondary_value]
+      [pmb, addr.additional_designation, addr.secondary_designator, secondary_value]
       |> Enum.reject(&is_nil/1)
       |> Enum.join(" ")
       |> String.trim()
