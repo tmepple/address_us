@@ -440,7 +440,7 @@ defmodule AddressUSTest do
       postal: "19947",
       plus_4: "1114",
       state: "DE",
-      street: %Street{primary_number: "2299", suffix: "Hwy", name: "Lewes-Georgetown"}
+      street: %Street{primary_number: "2299", suffix: "Hwy", name: "Lewes Georgetown"}
     }
 
     result = parse_address("A. P. Croll & Son 2299 Lewes-Georgetown Hwy

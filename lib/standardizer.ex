@@ -87,6 +87,7 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/-\s+/, "-")
     |> safe_replace(~r/\s+\-/, "-")
     # |> safe_replace(~r/(\D+)\-(\D+)/, "\\1 \\2")
+    |> safe_replace(~r/ ([A-Z]+)\-([A-Z]+) /, " \\1 \\2 ")
     # Tighten slashes and backslashes
     |> safe_replace(~r/\s?([\\\/])\s?/, "\\1")
     # Address ranges with THRU should use a dash instead
