@@ -164,8 +164,10 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\bI(-| )(\d+)/, "INTERSTATE_\\2")
     |> safe_replace(~r/\bI(\d+)/, "INTERSTATE_\\1")
     |> safe_replace(~r/\bI\s?H\s?(\d+)/, "INTERSTATE_\\1")
-    |> safe_replace(~r/\bUS(-| )\#?(\d+)/, "US_HIGHWAY_\\2")
-    |> safe_replace(~r/\bUS (HWY|HIGHWAY) \#?(\d+)/, "US_HIGHWAY_\\2")
+    |> safe_replace(~r/\bUS(-| )?\#?(\d+)/, "US_HIGHWAY_\\2")
+    |> safe_replace(~r/\bU\s?S (HWY|HIGHWAY) \#?(\d+)/, "US_HIGHWAY_\\2")
+    # Although USPS Pub 28 seems to prefer US HIGHWAY many laws refer to "US ROUTE" which is favored in sections of the country
+    |> safe_replace(~r/\bU\s?S (RT|RTE|ROUTE) \#?(\d+)/, "US_ROUTE_\\2")
     # |> safe_replace(~r/\bUS HIGHWAY (\d+)/, "US_HIGHWAY_\\1")
     |> safe_replace(~r/\b(FM|FARM TO MARKET|FARM TO MKT|HWY FM|FMR) \#?(\d+)/, "FM_\\2")
     |> safe_replace(~r/\bC\s?R\s\#?([\dA-Z]+)/, "COUNTY_ROAD_\\1")
@@ -248,6 +250,12 @@ defmodule AddressUS.Parser.Standardizer do
     else
       string
     end
+  end
+
+  def pipe_leading_corners(addr) do
+    addr
+    |> safe_replace(~r/^(N\s?E|N\s?W|S\s?E|S\s?W) CORNER (OF )?(.+)$/, "\\3|\\1 CORNER")
+    |> safe_replace(~r/^CORNER (OF )?(.+ \& .+)$/, "\\2")
   end
 
   @doc """

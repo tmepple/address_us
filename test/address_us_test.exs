@@ -1953,5 +1953,15 @@ defmodule AddressUSTest do
 
     assert clean_address_line("1320 S MAIN ST, ST RT 46 & SALT RD") ==
              "1320 S MAIN ST\nSTATE ROUTE 46 & SALT RD"
+
+    assert clean_address_line("2910 SR 67-27 N") == "2910 STATE ROUTE 67\n27 N"
+    assert clean_address_line("US160 & INTERSTATE 65") == "US HIGHWAY 160 & INTERSTATE 65"
+    assert clean_address_line("U S RTE 12") == "US ROUTE 12"
+    assert clean_address_line("6 US RTE 130") == "6 US ROUTE 130"
+
+    assert clean_address_line("CORNER SPRING RD AND JENNINGS RD") == "SPRING RD & JENNINGS RD"
+
+    assert clean_address_line("NE CORNER SPRING RD AND JENNINGS RD") ==
+             "SPRING RD & JENNINGS RD\nNE CORNER"
   end
 end

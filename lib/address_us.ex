@@ -125,6 +125,7 @@ defmodule AddressUS.Parser do
     # Text following a single comma hugging a suffix (ie 12 MAIN ST, HIGHWAY 31 S) is likely additional information which
     # causes issues when parsed (i.e. 12 MAIN ST S) so we should pipe delimit it here so when it gets parsed it is properly
     # called an "additional designation"
+    |> Standardizer.pipe_leading_corners()
     |> Standardizer.pipe_single_comma_slash_hyphen_hugging_suffix()
     |> log_term("std addr")
     |> String.split(" ")
@@ -151,6 +152,8 @@ defmodule AddressUS.Parser do
     |> Standardizer.standardize_intersections()
     |> Standardizer.standardize_address()
     |> Standardizer.standardize_highways(state)
+    |> Standardizer.pipe_leading_corners()
+
     # |> Standardizer.move_pinned_po_boxes_to_addr2()
     |> apply_casing_replace_pins(casing)
   end
