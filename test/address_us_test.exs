@@ -1945,5 +1945,13 @@ defmodule AddressUSTest do
     assert clean_address_line("50 NORTH AVENUE, NE") == "50 NORTH AVENUE NE"
     assert clean_address_line("50 NORTH AVENUE, NE SIDE") == "50 NORTH AVENUE\nNE SIDE"
     assert clean_address_line("29121 HIDE-A-WAY HILLS") == "29121 HIDE-A-WAY HILLS"
+
+    assert clean_address_line("40 E MAIN ST RTE 4") == "40 E MAIN ST\nROUTE 4"
+
+    assert clean_address_line("1320 S MAIN ST/ST RT 46 & SALT RD") ==
+             "1320 S MAIN ST\nSTATE ROUTE 46 & SALT RD"
+
+    assert clean_address_line("1320 S MAIN ST, ST RT 46 & SALT RD") ==
+             "1320 S MAIN ST\nSTATE ROUTE 46 & SALT RD"
   end
 end

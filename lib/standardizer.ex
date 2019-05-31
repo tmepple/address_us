@@ -183,11 +183,11 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\bSTATE (RT|RTE) \#?(\d+)/, "STATE_ROUTE_\\2")
     # The next two replacements are more complex to avoid false positives like 40 E MAIN ST RTE 4
     |> safe_replace(
-      ~r/(^|\s)(\d+|[NEWS\&\(]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD|^)(\s)?\/?ST (RD|ROAD) \#?(\d+)/,
+      ~r/(^|\s)(\d+|[NEWS\&\(]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD|^)([\s\/\,\-]+)ST (RD|ROAD) \#?(\d+)/,
       "\\1\\2\\3 STATE_ROAD_\\5"
     )
     |> safe_replace(
-      ~r/(^|\s)(\d+|[NEWS\&\(]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD|^)(\s)?\/?ST (RT|RTE|ROUTE) \#?(\d+)/,
+      ~r/(^|\s)(\d+|[NEWS\&\(]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD|^)([\s\/\,\-]+)ST (RT|RTE|ROUTE) \#?(\d+)/,
       "\\1\\2\\3 STATE_ROUTE_\\5"
     )
     # The next two replacements clean up from the above ST RD and ST RT replacements
