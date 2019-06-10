@@ -35,9 +35,10 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/^(.+)\((.+)\)$/, "\\1|\\2")
     |> safe_replace(~r/^\((.+)\)(.+)$/, "\\2|\\1")
     |> safe_replace(~r/^(.+)\(([^\)]+)$/, "\\1|\\2")
-    # |> String.replace_suffix(")", "")
     |> safe_replace(~r/\s\|/, "|")
-    |> eliminate_repitition()
+    |> eliminate_repetition()
+    # Remove trailing punctuation
+    |> safe_replace(~r/[ \)\,\(\/\;)]+$/, "")
   end
 
   # Standardizes the spacing around the commas, periods, and newlines and then
@@ -183,6 +184,8 @@ defmodule AddressUS.Parser.Standardizer do
     # The prefix to ST|STATE avoids false positives like "MAIN ST RT 40"
     |> safe_replace(~r/\bSTATE (RD|ROAD) \#?(\d+)/, "STATE_ROAD_\\2")
     |> safe_replace(~r/\bSTATE (RT|RTE) \#?(\d+)/, "STATE_ROUTE_\\2")
+    |> safe_replace(~r/^ST (RD|ROAD) \#?(\d+)/, "STATE_ROAD_\\2")
+    |> safe_replace(~r/^ST (RT|RTE) \#?(\d+)/, "STATE_ROUTE_\\2")
     # The next two replacements are more complex to avoid false positives like 40 E MAIN ST RTE 4
     |> safe_replace(
       ~r/(^|\s)(\d+|[NEWS\&\(]|NORTH|EAST|WEST|SOUTH|OLD|OF|ON|FROM|TO|AVE|ST|BLVD|DR|RD|^)([\s\/\,\-]+)ST (RD|ROAD) \#?(\d+)/,
@@ -237,7 +240,7 @@ defmodule AddressUS.Parser.Standardizer do
   end
 
   # Occasionally addresses will include the whole address repeated twice
-  defp eliminate_repitition(string) do
+  defp eliminate_repetition(string) do
     no_spaces = String.replace(string, " ", "")
     len = String.length(no_spaces)
 
@@ -254,8 +257,12 @@ defmodule AddressUS.Parser.Standardizer do
 
   def pipe_leading_corners(addr) do
     addr
-    |> safe_replace(~r/^(N\s?E|N\s?W|S\s?E|S\s?W) CORNER (OF )?(.+)$/, "\\3|\\1 CORNER")
-    |> safe_replace(~r/^CORNER (OF )?(.+ \& .+)$/, "\\2")
+    |> safe_replace(~r/^(N|S)[ \/](E|W) (CORNER|C\/O) /, "\\1\\2 CORNER ")
+    |> safe_replace(
+      ~r/^(NE|NW|SE|SW|NORTHEAST|NORTHWEST|SOUTHEAST|SOUTHWEST) (CORNER |C\/O )(OF )?(.+)$/,
+      "\\4|\\1 CORNER"
+    )
+    |> safe_replace(~r/^(CORNER |C\/O )(OF )?(.+ \& .+)$/, "\\3")
   end
 
   @doc """

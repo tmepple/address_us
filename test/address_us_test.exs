@@ -1963,5 +1963,14 @@ defmodule AddressUSTest do
 
     assert clean_address_line("NE CORNER SPRING RD AND JENNINGS RD") ==
              "SPRING RD & JENNINGS RD\nNE CORNER"
+
+    assert clean_address_line("2-453 ROAD V, P O BOX 364") == "2-453 ROAD V\nPO BOX 364"
+    assert clean_address_line("NW C/O FULTON RD & WALES RD") == "FULTON RD & WALES RD\nNW CORNER"
+
+    assert clean_address_line("NORTHWEST CORNER OF HARRISON/TUS") ==
+             "HARRISON/TUS\nNORTHWEST CORNER"
+
+    assert clean_address_line("ST RT 2 & ST RT 249") == "STATE ROUTE 2 & STATE ROUTE 249"
+    assert clean_address_line("C/O I 71 & RT 80)") == "INTERSTATE 71 & ROUTE 80"
   end
 end

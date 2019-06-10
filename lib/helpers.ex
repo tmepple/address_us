@@ -38,6 +38,7 @@ defmodule AddressUS.Parser.Helpers do
     |> safe_replace("_", " ")
     |> safe_replace("|", "\n")
     |> only_retain_first_newline()
+    |> safe_replace(",\n", "\n")
     |> title_case()
   end
 
@@ -47,6 +48,7 @@ defmodule AddressUS.Parser.Helpers do
     |> safe_replace("_", " ")
     |> safe_replace("|", "\n")
     |> only_retain_first_newline()
+    |> safe_replace(",\n", "\n")
   end
 
   defp only_retain_first_newline(nil), do: nil
@@ -303,7 +305,7 @@ defmodule AddressUS.Parser.Helpers do
   end
 
   def log_term(term \\ nil, label) do
-    # Logger.debug(label <> ": " <> inspect(term))
+    Logger.debug(label <> ": " <> inspect(term))
     term
   end
 
