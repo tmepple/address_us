@@ -305,7 +305,7 @@ defmodule AddressUS.Parser.Helpers do
   end
 
   def log_term(term \\ nil, label) do
-    Logger.debug(label <> ": " <> inspect(term))
+    # Logger.debug(label <> ": " <> inspect(term))
     term
   end
 
