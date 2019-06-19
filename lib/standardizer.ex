@@ -30,7 +30,7 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\b(S|N)\.(E|W)\./, "\\1\\2")
     # Remove periods that are not adjacent to digits
     |> safe_replace(~r/(?!\d)\.(?!\d)/, " ")
-    |> safe_replace("  ", " ")
+    |> safe_replace(~r/ {2,}/, " ")
     # Mark leading or trailing parenthesis or unclosed parens to second line represented by a pipe character at this point
     |> safe_replace(~r/^(.+)\((.+)\)$/, "\\1|\\2")
     |> safe_replace(~r/^\((.+)\)(.+)$/, "\\2|\\1")
@@ -76,7 +76,7 @@ defmodule AddressUS.Parser.Standardizer do
     # Otherwise remove them and other quotes, question marks, and exclamation marks
     |> safe_replace(~r/(\d+)[\'\`]\s(\D)/, "\\1 FT \\2")
     |> safe_replace(~r/[\'\`\?\!\"]/, "")
-    |> safe_replace(~r/\s+/, " ")
+    |> safe_replace(~r/ {2,}/, " ")
     # Properly space commas
     |> safe_replace(~r/,(\S)/, ", \\1")
     |> safe_replace(~r/\s,(\S)/, ", \\1")
@@ -112,7 +112,7 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\sALSO\s/, "")
     |> safe_replace(~r/\sATTENTION\s/, "")
     |> safe_replace(~r/\sATTN\s/, "")
-    |> safe_replace("  ", " ")
+    |> safe_replace(~r/ {2,}/, " ")
 
     ## Following lines were commented out from the original implementation but were not covered by tests
     # Following line is commented out as not sure the purpose -- no existing tests target it
