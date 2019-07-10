@@ -391,11 +391,11 @@ defmodule AddressUS.Parser do
   @doc "Given a street struct will return a tuple of formatted strings for the addr and addr2"
   def addr_and_addr2_from_street(%Street{} = addr) do
     {primary_number, secondary_value} =
-      case {addr.secondary_value, addr.secondary_designator} do
-        {"M", nil} ->
+      case {addr.secondary_value, addr.secondary_designator, addr.primary_number} do
+        {"M", nil, pn} when not is_nil(pn) ->
           {addr.primary_number <> "M", nil}
 
-        {val, nil} when not is_nil(val) ->
+        {val, nil, pn} when not is_nil(val) and not is_nil(pn) ->
           if Integer.parse(val) == :error,
             do: {addr.primary_number <> "-" <> addr.secondary_value, nil},
             else: {addr.primary_number <> " " <> addr.secondary_value, nil}

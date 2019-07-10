@@ -1972,5 +1972,6 @@ defmodule AddressUSTest do
 
     assert clean_address_line("ST RT 2 & ST RT 249") == "STATE ROUTE 2 & STATE ROUTE 249"
     assert clean_address_line("C/O I 71 & RT 80)") == "INTERSTATE 71 & ROUTE 80"
+    assert clean_address_line("3718 IVES RD") == "3718 IVES RD"
   end
 end

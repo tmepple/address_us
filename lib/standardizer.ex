@@ -102,7 +102,7 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/^(\d+)([NEWS])\-?(\d+)([NEWS])$/, "\\1 \\2 \\3 \\4")
 
     # Remove mail routing instructions
-    |> safe_replace(~r/\sI.E.\s/, "")
+    |> safe_replace(~r/\sI\.E\.\s/, "")
     |> safe_replace(~r/\sET\sAL\s/, "")
     |> safe_replace(~r/\sIN\sCARE\sOF\s/, "")
     |> safe_replace(~r/\sCARE\sOF\s/, "")
