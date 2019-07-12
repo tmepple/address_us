@@ -1824,6 +1824,19 @@ defmodule AddressUSTest do
     assert desired_result == parse_address("6281 M 22, Glen Arbor, MI")
   end
 
+  # NOTE: This parses out the city incorrectly but previously this address caused an exception
+  test "Slip P54/Burnham Harbor  Chicago, Il" do
+    desired_result = %Address{
+      city: "Harbor Chicago",
+      state: "IL",
+      street: %Street{
+        name: "Slip P54/burnham"
+      }
+    }
+
+    assert desired_result == parse_address("Slip P54/Burnham Harbor  Chicago, Il")
+  end
+
   test "Clean address lines" do
     # With the embedded slash since this could be a intersection it's only standardized not parsed.
     assert clean_address_line("127 WEST JASPER ST/US HWY 24 W") ==

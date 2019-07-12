@@ -520,11 +520,14 @@ defmodule AddressUS.Parser.AddrLine do
     {nil, nil, nil, addit, backup}
   end
 
-  defp get_secondary(address, _backup, pmb, designator, value, addit, true) do
-    [_ | tail] = address
-
+  defp get_secondary(address, backup, pmb, designator, value, addit, true) do
     cond do
+      address == [] ->
+        {nil, nil, nil, addit, backup}
+
       value == nil && pmb != nil ->
+        [_ | tail] = address
+
         clean_designator = safe_replace(designator, ",", "")
         clean_pmb = safe_replace(pmb, ",", "")
         {clean_designator, nil, clean_pmb, addit, tail}
