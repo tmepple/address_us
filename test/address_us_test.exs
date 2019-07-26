@@ -1890,7 +1890,7 @@ defmodule AddressUSTest do
     assert clean_address_line("906A S PETERCHEFF STREET") == "906-A S PETERCHEFF ST"
     assert clean_address_line("906-A S PETERCHEFF STREET") == "906-A S PETERCHEFF ST"
     assert clean_address_line("906S WASHINGTON AVENUE") == "906 S WASHINGTON AVE"
-    assert clean_address_line("1M S OF HWY 44") == "1M S OF HIGHWAY 44"
+    assert clean_address_line("1M S OF HWY 44") == "1 M S OF HIGHWAY 44"
     assert clean_address_line("22423 I H 45") == "22423 INTERSTATE 45"
 
     # Don't capture a second number in an address like this as a secondary value set off with a dash
@@ -1903,7 +1903,9 @@ defmodule AddressUSTest do
     assert clean_address_line("ADDRESS WITH ?? AND !!! AND ` AND '") == "ADDRESS WITH & & &"
     assert clean_address_line("4880 ST RT 38 NE") == "4880 STATE ROUTE 38 NE"
     assert clean_address_line("3203 ST RT 113") == "3203 STATE ROUTE 113"
-    assert clean_address_line("9675 C.H.&D. RD") == "9675 C H & D RD"
+    # Next line is for ALT 1 of the period replacement
+    # assert clean_address_line("9675 C.H.&D. RD") == "9675 C H & D RD"
+    assert clean_address_line("9675 C.H.&D. RD") == "9675 CH & D RD"
 
     assert clean_address_line("14 W PIKE (ST RT 55 @ GRANT)") ==
              "14 W PIKE\nSTATE ROUTE 55 & GRANT"
@@ -1986,5 +1988,15 @@ defmodule AddressUSTest do
     assert clean_address_line("ST RT 2 & ST RT 249") == "STATE ROUTE 2 & STATE ROUTE 249"
     assert clean_address_line("C/O I 71 & RT 80)") == "INTERSTATE 71 & ROUTE 80"
     assert clean_address_line("3718 IVES RD") == "3718 IVES RD"
+    assert clean_address_line("1217 FL ST") == "1217 FL ST"
+    assert clean_address_line("10,000 HAVANA ST") == "10000 HAVANA ST"
+
+    assert clean_address_line("SOUTH SIDE OF PUAINAKO STREET, 6,850 FEET WEST FROM") ==
+             "SOUTH SIDE OF PUAINAKO STREET, 6,850 FEET WEST FROM"
+
+    assert clean_address_line(".2 SE OF HWY 22 AND F.M. 639") == ".2 SE OF HIGHWAY 22 & FM 639"
+    assert clean_address_line("3.5MI.SO.OF RAYWOOD ON FM 760") == "3.5 MI SO OF RAYWOOD ON FM 760"
+    assert clean_address_line("1/2MI W OF SRALT 31 ON CR1003") == "1/2 MI W OF SRALT 31 ON CR1003"
+    assert clean_address_line("24-MILE BEND OF MOBILE RIVER") == "24 MILE BEND OF MOBILE RIVER"
   end
 end

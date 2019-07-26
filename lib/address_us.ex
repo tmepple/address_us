@@ -393,7 +393,7 @@ defmodule AddressUS.Parser do
     {primary_number, secondary_value} =
       case {addr.secondary_value, addr.secondary_designator, addr.primary_number} do
         {"M", nil, pn} when not is_nil(pn) ->
-          {addr.primary_number <> "M", nil}
+          {addr.primary_number <> " M", nil}
 
         {val, nil, pn} when not is_nil(val) and not is_nil(pn) ->
           if Integer.parse(val) == :error,

@@ -605,8 +605,9 @@ defmodule AddressUS.Parser.AddrLine do
             get_secondary(backup, backup, nil, nil, nil, addit, true)
         end
 
-      value && Map.values(units) |> Enum.member?(head) ->
+      value && Map.values(units) |> Enum.member?(head) && length(tail) > 1 ->
         log_term("at 8")
+        # IO.inspect({value, Map.values(units), head, tail})
         get_secondary(tail, backup, pmb, head, value, addit, true)
 
       safe_starts_with?(head, "#") && !contains_po_box?(address) ->
@@ -671,7 +672,7 @@ defmodule AddressUS.Parser.AddrLine do
             log_term("at 11")
             get_secondary(tail_tail, backup, pmb, secondary_unit, head <> value, addit, true)
 
-          Enum.member?(all_unit_values, head) ->
+          Enum.member?(all_unit_values, head) && length(tail) > 1 ->
             secondary_unit =
               cond do
                 Map.values(units) |> Enum.member?(head) ->
