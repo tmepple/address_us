@@ -1998,5 +1998,11 @@ defmodule AddressUSTest do
     assert clean_address_line("3.5MI.SO.OF RAYWOOD ON FM 760") == "3.5 MI SO OF RAYWOOD ON FM 760"
     assert clean_address_line("1/2MI W OF SRALT 31 ON CR1003") == "1/2 MI W OF SRALT 31 ON CR1003"
     assert clean_address_line("24-MILE BEND OF MOBILE RIVER") == "24 MILE BEND OF MOBILE RIVER"
+    assert clean_address_line("4200 D.E. SANDERS ROAD") == "4200 DE SANDERS RD"
+
+    assert clean_address_line("1/4MI.N.OF HWY.6 ON COUNTY RD") ==
+             "1/4 MI N OF HIGHWAY 6 ON COUNTY RD"
+
+    assert clean_address_line("59-97 (REAR) CHAPEL STREET") == "59-97 CHAPEL ST\nREAR"
   end
 end

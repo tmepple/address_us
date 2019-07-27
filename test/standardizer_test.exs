@@ -62,4 +62,12 @@ defmodule StandardizerTest do
   test "13" do
     assert handle_double_number_streets("86 12 TH STREET") == "86 12TH STREET"
   end
+
+  test "14" do
+    assert handle_double_number_streets("4740 NW 15 WAY") == "4740 NW 15TH WAY"
+  end
+
+  test "15" do
+    assert handle_double_number_streets("201 E 21 ST ST") == "201 E 21ST ST"
+  end
 end
