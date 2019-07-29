@@ -90,8 +90,11 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/(.+)#/, "\\1 #")
     |> safe_replace(~r/\#\s+/, "#")
     # Apostrophes or backticks against a number with a non-number afterwards usually refer to feet.  
-    # Otherwise remove them and other quotes, question marks, and exclamation marks
-    |> safe_replace(~r/(\d+)[\'\`]\s?([A-Z])/, "\\1 FT \\2")
+    # Otherwise remove them and other quotes, question marks, and exclamation marks or replace with space if 
+    # Between numbers
+    # |> safe_replace(~r/(\d+)[\'\`]\s?([A-Z])/, "\\1 FT \\2")
+    |> safe_replace(~r/(\d+)[\'\`]\s?(?!TH |RD |ST |ND )([A-Z])/, "\\1 FT \\2")
+    |> safe_replace(~r/(\d+)[\'\`\"](\d+)/, "\\1 \\2")
     |> safe_replace(~r/[\'\`\?\!\"]/, "")
     |> safe_replace(~r/ {2,}/, " ")
     # Remove commas if in first term as a number
@@ -364,7 +367,8 @@ defmodule AddressUS.Parser.Standardizer do
     street_name
     |> safe_replace(~r/\&AMP\;/, " & ")
     |> safe_replace(~r/\sAND\s/, " & ")
-    |> safe_replace(~r/\sAT\s/, " & ")
+    # |> safe_replace(~r/\sAT\s/, " & ")
+    |> safe_replace(~r/ AT ([A-Z]+|\d+[A-Z]+)\b/, " & \\1")
     |> safe_replace(~r/\@/, " & ")
     |> safe_replace(~r/^JCT\.? (OF )?(.+\&.+)/, "\\2")
   end

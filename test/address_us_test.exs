@@ -2004,5 +2004,8 @@ defmodule AddressUSTest do
              "1/4 MI N OF HIGHWAY 6 ON COUNTY RD"
 
     assert clean_address_line("59-97 (REAR) CHAPEL STREET") == "59-97 CHAPEL ST\nREAR"
+    assert clean_address_line("ALTA STREET AT 34TH STREET") == "ALTA STREET & 34TH STREET"
+    assert clean_address_line("MINE AT 41 02'57' 122 43'39'") == "MINE AT 41 02 57 122 43 39"
+    assert clean_address_line("8'TH AVE AND 33'RD STREET") == "8TH AVE & 33RD STREET"
   end
 end
