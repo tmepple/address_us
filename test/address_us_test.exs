@@ -1855,7 +1855,7 @@ defmodule AddressUSTest do
     assert clean_address_line("2500 N. ST. MARY'S") == "2500 N ST MARYS"
 
     assert clean_address_line("500' W OF TEMPLE ON SR 104") ==
-             "500 FT W OF TEMPLE ON STATE ROUTE 104"
+             "500 FEET W OF TEMPLE ON STATE ROUTE 104"
 
     assert clean_address_line("150 Ho'okele St") == "150 HOOKELE ST"
     assert clean_address_line("11300 - 88TH AVENUE") == "11300 88TH AVE"
