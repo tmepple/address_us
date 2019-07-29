@@ -91,7 +91,7 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\#\s+/, "#")
     # Apostrophes or backticks against a number with a non-number afterwards usually refer to feet.  
     # Otherwise remove them and other quotes, question marks, and exclamation marks
-    |> safe_replace(~r/(\d+)[\'\`]\s?(\D)/, "\\1 FT \\2")
+    |> safe_replace(~r/(\d+)[\'\`]\s?([A-Z])/, "\\1 FT \\2")
     |> safe_replace(~r/[\'\`\?\!\"]/, "")
     |> safe_replace(~r/ {2,}/, " ")
     # Remove commas if in first term as a number
