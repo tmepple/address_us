@@ -95,6 +95,7 @@ defmodule AddressUS.Parser.Standardizer do
     # |> safe_replace(~r/(\d+)[\'\`]\s?([A-Z])/, "\\1 FT \\2")
     |> safe_replace(~r/(\d+)[\'\`]\s?(?!TH |RD |ST |ND )([A-Z])/, "\\1 FEET \\2")
     |> safe_replace(~r/(\d+)[\'\`\"](\d+)/, "\\1 \\2")
+    |> safe_replace(~r/^(\d+)[- ]+(\d+)(ST |ND |RD |TH )/, "\\1 \\2 \\3")
     |> safe_replace(~r/[\'\`\?\!\"]/, "")
     |> safe_replace(~r/ {2,}/, " ")
     # Remove commas if in first term as a number
