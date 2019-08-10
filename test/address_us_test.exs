@@ -576,11 +576,12 @@ defmodule AddressUSTest do
     assert desired_result == result
   end
 
+  # Modified this test to not lose information about State Rd 2
   test "Parse address: State Rd 2 & Carr #128, Yauco, PR" do
     desired_result = %Address{
       city: "Yauco",
       state: "PR",
-      street: %Street{name: "Carr", pmb: "128"}
+      street: %Street{name: "State Road 2 & Carr", pmb: "128"}
     }
 
     result = parse_address("State Rd 2 & Carr #128, Yauco, PR")
@@ -1369,8 +1370,8 @@ defmodule AddressUSTest do
         name: "Airport",
         primary_number: "2060",
         suffix: "Dr",
-        secondary_designator: "Hngr",
-        secondary_value: "39"
+        additional_designation: "Hanger",
+        pmb: "39"
       }
     }
 
@@ -1827,10 +1828,10 @@ defmodule AddressUSTest do
   # NOTE: This parses out the city incorrectly but previously this address caused an exception
   test "Slip P54/Burnham Harbor  Chicago, Il" do
     desired_result = %Address{
-      city: "Harbor Chicago",
+      city: nil,
       state: "IL",
       street: %Street{
-        name: "Slip P54/burnham"
+        name: "Slip P54/burnham Harbor Chicago"
       }
     }
 
@@ -2008,5 +2009,13 @@ defmodule AddressUSTest do
     assert clean_address_line("MINE AT 41 02'57' 122 43'39'") == "MINE AT 41 02 57 122 43 39"
     assert clean_address_line("8'TH AVE AND 33'RD STREET") == "8TH AVE & 33RD STREET"
     assert clean_address_line("2100 -11TH ST") == "2100 11TH ST"
+    assert clean_address_line("PO BOX A-10") == "PO BOX A-10"
+    assert clean_address_line("11606 #C GARVEY AVE") == "11606 GARVEY AVE\n#C"
+
+    assert clean_address_line("2 .5 MI NW OF MIDWAY OFF HIGHWAY 433") ==
+             "2.5 MI NW OF MIDWAY OFF HIGHWAY 433"
+
+    assert clean_address_line("2 .5MI SW OF BUDE N OF HOMOCHITO") ==
+             "2.5 MI SW OF BUDE N OF HOMOCHITO"
   end
 end

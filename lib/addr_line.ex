@@ -788,10 +788,14 @@ defmodule AddressUS.Parser.AddrLine do
     [head | tail] = address
 
     cond do
-      head == "&" || head == "AND" ->
-        get_street(tail, nil, false)
+      # NOTE: Removed as this was causing lost information in case a street ends in AND for some reason and no test cases
+      # were affected negatively.
+      # head == "&" || head == "AND" ->
+      #   log_term("at 1")
+      #   get_street(tail, nil, false)
 
       length(address) == 0 ->
+        log_term("at 2")
         directions = AddressUSConfig.directions()
         rev_directions = AddressUSConfig.reversed_directions()
         keys = Map.keys(directions)
@@ -816,6 +820,8 @@ defmodule AddressUS.Parser.AddrLine do
         get_street(address, street_name, true)
 
       length(clean_hyphenated_street(head)) > 1 ->
+        log_term("at 3")
+
         cond do
           is_sec_unit_suffix_num_or_frac?(street) ->
             get_street(tail, street <> " " <> head, false)
@@ -825,12 +831,15 @@ defmodule AddressUS.Parser.AddrLine do
         end
 
       true ->
+        log_term("at 4")
+
         new_address =
           cond do
             street == nil -> head
             true -> street <> " " <> head
           end
 
+        log_term({tail, new_address}, "at 5")
         get_street(tail, new_address, false)
     end
   end

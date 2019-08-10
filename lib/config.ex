@@ -458,25 +458,25 @@ defmodule AddressUSConfig do
       "DEPARTMENT" => "DEPT",
       "FLOOR" => "FL",
       # "FRONT" => "FRNT",
-      "HANGAR" => "HNGR",
-      "HANGER" => "HNGR",
+      # "HANGAR" => "HNGR",
+      # "HANGER" => "HNGR",
       "LOBBY" => "LBBY",
       "LOT" => "LOT",
       # False positives with Roads including Lower
       # "LOWER" => "LOWR",
       "MAILSTOP" => "MS",
-      "OFFICE" => "OFC",
+      # "OFFICE" => "OFC",
       "PENTHOUSE" => "PH",
-      "PIER" => "PIER",
+      # "PIER" => "PIER",
       # "REAR" => "REAR",
       "ROOM" => "RM",
-      "SIDE" => "SIDE",
-      "SLIP" => "SLIP",
+      # "SIDE" => "SIDE",
+      # "SLIP" => "SLIP",
       # "SPACE" => "SPC",
       # FALSE POSITIVE WITH ROADS NAMED STOP
       # "STOP" => "STOP",
       "SUITE" => "STE",
-      "TRAILER" => "TRLR",
+      # "TRAILER" => "TRLR",
       "UNIT" => "UNIT"
       # False positives with roads including Upper
       # "UPPER" => "UPPR"

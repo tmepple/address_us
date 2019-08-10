@@ -25,6 +25,10 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/^(\d+)([A-Z]{3,})/, "\\1 \\2")
     # Handle 123-44TH ST
     |> safe_replace(~r/^(\d+)\-(\d+(ST|ND|RD|TH))\s/, "\\1 \\2 ")
+    # Handle 123 #C 44TH AVE by moving the unit number to the end for future parsing
+    |> safe_replace(~r/^(\d+) ?(\#[A-Z\d]+) (.+)$/, "\\1 \\3 \\2")
+    # Tighten decimal numbers at beginning
+    |> safe_replace(~r/^(\d+) (\.\d+)/, "\\1\\2")
     # If the address ends with numbers or single characters seperated by an ampersand it's usually "12 MAIN ST STE 8 & 9"
     # This causes issues for the parser so we pin them together then after processing expand it back to ampersands
     |> safe_replace(~r/ (\d+|[A-Z]) \& (\d+|[A-Z])$/, " \\1^\\2")
@@ -284,12 +288,22 @@ defmodule AddressUS.Parser.Standardizer do
     |> safe_replace(~r/\b(?:POB|POBOX) ([\dA-Z]+)/, "PO BOX \\1")
     |> safe_replace(~r/[\/\-]PO BOX/, " PO BOX")
     # If a PO Box is not alone and not already moved to addr2, move it now
-    |> safe_replace(~r/^([^\|]+) PO BOX ([\dA-Z]+)$/, "\\1|PO_BOX_\\2")
-    |> safe_replace(~r/^PO BOX\s*([\dA-Z]+)[ \,\/\-\&]+(.+)$/, "\\2|PO_BOX_\\1")
+    |> maybe_move_po_box()
     |> safe_replace(
       ~r/ (ROAD|RD|STREET|ST|BOULEVARD|BLVD|AVENUE|AVE|\w+\_\w+) BOX ([\dA-Z]+)$/,
       " \\1|BOX \\2"
     )
+  end
+
+  defp maybe_move_po_box(addr) do
+    # If the PO Box is alone on the line (also potentially with a dash inside it) then don't move it
+    if Regex.match?(~r/^PO BOX *[\dA-Z]+\-?([\dA-Z]+)?$/, addr) do
+      addr
+    else
+      addr
+      |> safe_replace(~r/^([^\|]+) PO BOX ([\dA-Z]+)$/, "\\1|PO_BOX_\\2")
+      |> safe_replace(~r/^PO BOX\s*([\dA-Z]+)[ \,\/\-\&]+(.+)$/, "\\2|PO_BOX_\\1")
+    end
   end
 
   @doc "Given the parsed street address or full address line will standardize highways into USPS standard abbreviations"
